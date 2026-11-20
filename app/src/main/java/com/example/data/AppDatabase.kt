@@ -12,9 +12,10 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         InstallmentEntity::class,
         RecentSearchEntity::class,
         PriceTargetEntity::class,
-        ScannedPriceEntity::class
+        ScannedPriceEntity::class,
+        ProductNoteEntity::class
     ],
-    version = 4,
+    version = 5,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -22,6 +23,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun recentSearchDao(): RecentSearchDao
     abstract fun priceTargetDao(): PriceTargetDao
     abstract fun scannedPriceDao(): ScannedPriceDao
+    abstract fun productNoteDao(): ProductNoteDao
 
     companion object {
         @Volatile
@@ -79,6 +81,25 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `product_notes` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `productCode` TEXT NOT NULL,
+                        `productName` TEXT NOT NULL,
+                        `noteText` TEXT NOT NULL,
+                        `updatedAt` INTEGER NOT NULL
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_product_notes_productCode_updatedAt` ON `product_notes` (`productCode`, `updatedAt`)"
+                )
+            }
+        }
+
         fun getInstance(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 INSTANCE ?: Room.databaseBuilder(
@@ -86,7 +107,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "pvs_cuotas_db"
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
                     .build()
                     .also { INSTANCE = it }
             }

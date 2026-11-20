@@ -13,6 +13,7 @@ import com.example.data.InstallmentRepository
 import com.example.data.PaymentAlert
 import com.example.data.PriceTargetEntity
 import com.example.data.ProductCodeInfo
+import com.example.data.ProductNoteEntity
 import com.example.data.ProductVerifierCatalog
 import com.example.data.RecentSearchEntity
 import com.example.data.ScannedPriceEntity
@@ -53,7 +54,8 @@ data class PvsUiState(
     val showNotificationsSheet: Boolean = false,
     val lastScannedBarcode: String? = null,
     val priceTargets: Map<String, PriceTargetEntity> = emptyMap(),
-    val scannedPriceHistory: Map<String, List<ScannedPriceEntity>> = emptyMap()
+    val scannedPriceHistory: Map<String, List<ScannedPriceEntity>> = emptyMap(),
+    val productNotes: Map<String, List<ProductNoteEntity>> = emptyMap()
 ) {
     val activeInstallments: List<InstallmentEntity>
         get() = installments.filter { !it.isCompleted }
@@ -72,6 +74,9 @@ data class PvsUiState(
 
     fun scannedHistoryFor(code: String?): List<ScannedPriceEntity> =
         code?.trim()?.uppercase()?.let { scannedPriceHistory[it] }.orEmpty()
+
+    fun notesForProduct(code: String?): List<ProductNoteEntity> =
+        code?.trim()?.uppercase()?.let { productNotes[it] }.orEmpty()
 }
 
 private data class PreferenceUiSlice(
@@ -135,7 +140,8 @@ class PvsViewModel(
         _aiAnalysisState,
         _lastScannedBarcode,
         repository.priceTargets,
-        repository.scannedPrices
+        repository.scannedPrices,
+        repository.productNotes
     ) { values ->
         @Suppress("UNCHECKED_CAST")
         val tab = values[0] as PvsTab
@@ -158,6 +164,8 @@ class PvsViewModel(
         val targetList = values[12] as List<PriceTargetEntity>
         @Suppress("UNCHECKED_CAST")
         val scannedPricesList = values[13] as List<ScannedPriceEntity>
+        @Suppress("UNCHECKED_CAST")
+        val notesList = values[14] as List<ProductNoteEntity>
 
         val displayedList = optimistic ?: dbList
         val alerts = DueDateUtils.computeUpcomingAlerts(
@@ -188,13 +196,32 @@ class PvsViewModel(
             priceTargets = targetList.associateBy { it.code.uppercase() },
             scannedPriceHistory = scannedPricesList
                 .groupBy { it.productCode.uppercase() }
-                .mapValues { (_, items) -> items.takeLast(5) }
+                .mapValues { (_, items) -> items.takeLast(5) },
+            productNotes = notesList.groupBy { it.productCode.uppercase() }
         )
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
         initialValue = PvsUiState()
     )
+
+    fun addProductNote(product: ProductCodeInfo, noteText: String) {
+        viewModelScope.launch {
+            repository.addProductNote(product, noteText)
+        }
+    }
+
+    fun updateProductNote(note: ProductNoteEntity, newText: String) {
+        viewModelScope.launch {
+            repository.updateProductNote(note, newText)
+        }
+    }
+
+    fun deleteProductNote(noteId: Int) {
+        viewModelScope.launch {
+            repository.deleteProductNote(noteId)
+        }
+    }
 
     fun logObservedScannedPrice(product: ProductCodeInfo, observedPrice: Double, rawBarcode: String? = null) {
         viewModelScope.launch {

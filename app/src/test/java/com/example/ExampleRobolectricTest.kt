@@ -568,4 +568,91 @@ class ExampleRobolectricTest {
             Dispatchers.resetMain()
         }
     }
+
+    @Test
+    fun `room productNoteDao inserts updates deletes and isolates notes per product`() = runTest {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val db = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java)
+            .allowMainThreadQueries()
+            .build()
+        try {
+            val tv = ProductVerifierCatalog.findByQuery("TV-50")!!
+            val aud = ProductVerifierCatalog.findByQuery("AUD-05")!!
+            val repo = InstallmentRepository(
+                dao = db.installmentDao(),
+                recentSearchDao = db.recentSearchDao(),
+                priceTargetDao = db.priceTargetDao(),
+                scannedPriceDao = db.scannedPriceDao(),
+                productNoteDao = db.productNoteDao()
+            )
+
+            repo.addProductNote(tv, "2 años de garantía en tienda")
+            repo.addProductNote(aud, "Incluye estuche de carga")
+
+            val tvNotes = db.productNoteDao().observeForProduct("TV-50").first()
+            val audNotes = db.productNoteDao().observeForProduct("AUD-05").first()
+            assertEquals(1, tvNotes.size)
+            assertEquals("2 años de garantía en tienda", tvNotes.first().noteText)
+            assertEquals(1, audNotes.size)
+            assertEquals("Incluye estuche de carga", audNotes.first().noteText)
+
+            // Update TV-50 note and verify AUD-05 stays untouched
+            repo.updateProductNote(tvNotes.first(), "Garantía extendida 3 años + instalación")
+            val updatedTvNotes = db.productNoteDao().observeForProduct("TV-50").first()
+            assertEquals("Garantía extendida 3 años + instalación", updatedTvNotes.first().noteText)
+            assertEquals("Incluye estuche de carga", db.productNoteDao().observeForProduct("AUD-05").first().first().noteText)
+
+            // Delete TV-50 note
+            repo.deleteProductNote(updatedTvNotes.first().id)
+            assertTrue(db.productNoteDao().observeForProduct("TV-50").first().isEmpty())
+            assertEquals(1, db.productNoteDao().observeForProduct("AUD-05").first().size)
+        } finally {
+            db.close()
+        }
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun `viewmodel exposes productNotes map and performs add update delete via Room`() = runTest {
+        val dispatcher = UnconfinedTestDispatcher(testScheduler)
+        Dispatchers.setMain(dispatcher)
+        try {
+            val context = ApplicationProvider.getApplicationContext<Context>()
+            val db = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java)
+                .allowMainThreadQueries()
+                .build()
+            try {
+                val repo = InstallmentRepository(
+                    dao = db.installmentDao(),
+                    recentSearchDao = db.recentSearchDao(),
+                    priceTargetDao = db.priceTargetDao(),
+                    scannedPriceDao = db.scannedPriceDao(),
+                    productNoteDao = db.productNoteDao()
+                )
+                val vm = PvsViewModel(repository = repo)
+                val tv = ProductVerifierCatalog.findByQuery("TV-50")!!
+
+                vm.addProductNote(tv, "Consultar envío gratis")
+                val afterAdd = vm.uiState.first {
+                    it.notesForProduct("TV-50").any { note -> note.noteText == "Consultar envío gratis" }
+                }
+                val addedNote = afterAdd.notesForProduct("tv-50").first()
+                assertEquals("TV-50", addedNote.productCode)
+
+                vm.updateProductNote(addedNote, "Envío gratis confirmado")
+                val afterUpdate = vm.uiState.first {
+                    it.notesForProduct("TV-50").any { note -> note.noteText == "Envío gratis confirmado" }
+                }
+                assertEquals(1, afterUpdate.notesForProduct("TV-50").size)
+
+                vm.deleteProductNote(addedNote.id)
+                val afterDelete = vm.uiState.first { it.notesForProduct("TV-50").isEmpty() }
+                assertTrue(afterDelete.notesForProduct("TV-50").isEmpty())
+            } finally {
+                db.close()
+            }
+        } finally {
+            Dispatchers.resetMain()
+        }
+    }
 }

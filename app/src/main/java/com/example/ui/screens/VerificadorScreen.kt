@@ -93,12 +93,14 @@ import androidx.compose.ui.unit.dp
 import com.example.ai.AiAnalysisUiState
 import com.example.data.PriceVerdict
 import com.example.data.ProductCodeInfo
+import com.example.data.ProductNoteEntity
 import com.example.data.ProductVerifierCatalog
 import com.example.ui.PvsUiState
 import com.example.ui.components.BarcodeScannerDialog
 import com.example.ui.components.CodePillBadge
 import com.example.ui.components.PriceHistoryDashboardCard
 import com.example.ui.components.PriceTargetTrackerCard
+import com.example.ui.components.ProductNotesCard
 import com.example.ui.components.PvsCurvedWaveOverlay
 import com.example.ui.components.PvsHeaderBar
 import com.example.ui.components.ScannedProductShowcaseCard
@@ -146,6 +148,9 @@ fun VerificadorScreen(
     onClearPriceTarget: (String) -> Unit = {},
     onLogScannedPrice: (ProductCodeInfo, Double) -> Unit = { _, _ -> },
     onClearScannedHistory: (String) -> Unit = {},
+    onAddProductNote: (ProductCodeInfo, String) -> Unit = { _, _ -> },
+    onUpdateProductNote: (ProductNoteEntity, String) -> Unit = { _, _ -> },
+    onDeleteProductNote: (Int) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val strings = LocalAppStrings.current
@@ -571,6 +576,15 @@ fun VerificadorScreen(
                             onClearScannedHistory = {
                                 onClearScannedHistory(product.code)
                             }
+                        )
+
+                        // Step 2c: Custom Room-Backed Product Notes
+                        ProductNotesCard(
+                            product = product,
+                            notes = state.notesForProduct(product.code),
+                            onAddNote = { text -> onAddProductNote(product, text) },
+                            onUpdateNote = onUpdateProductNote,
+                            onDeleteNote = onDeleteProductNote
                         )
 
                         // Step 3: "¿Cuánto dinero tienes?" + Affordability Calculator

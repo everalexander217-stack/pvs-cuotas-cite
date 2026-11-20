@@ -6,7 +6,8 @@ class InstallmentRepository(
     private val dao: InstallmentDao,
     private val recentSearchDao: RecentSearchDao? = null,
     private val priceTargetDao: PriceTargetDao? = null,
-    private val scannedPriceDao: ScannedPriceDao? = null
+    private val scannedPriceDao: ScannedPriceDao? = null,
+    private val productNoteDao: ProductNoteDao? = null
 ) {
     val installments: Flow<List<InstallmentEntity>> = dao.observeAll()
     val recentSearches: Flow<List<RecentSearchEntity>> =
@@ -15,6 +16,39 @@ class InstallmentRepository(
         priceTargetDao?.observeAll() ?: kotlinx.coroutines.flow.flowOf(emptyList())
     val scannedPrices: Flow<List<ScannedPriceEntity>> =
         scannedPriceDao?.observeAll() ?: kotlinx.coroutines.flow.flowOf(emptyList())
+    val productNotes: Flow<List<ProductNoteEntity>> =
+        productNoteDao?.observeAll() ?: kotlinx.coroutines.flow.flowOf(emptyList())
+
+    suspend fun addProductNote(product: ProductCodeInfo, noteText: String) {
+        val noteDao = productNoteDao ?: return
+        val normalizedCode = product.code.trim().uppercase()
+        val trimmedText = noteText.trim()
+        if (normalizedCode.isEmpty() || trimmedText.isEmpty()) return
+        noteDao.insert(
+            ProductNoteEntity(
+                productCode = normalizedCode,
+                productName = product.name,
+                noteText = trimmedText,
+                updatedAt = System.currentTimeMillis()
+            )
+        )
+    }
+
+    suspend fun updateProductNote(note: ProductNoteEntity, newText: String) {
+        val noteDao = productNoteDao ?: return
+        val trimmedText = newText.trim()
+        if (trimmedText.isEmpty()) return
+        noteDao.update(
+            note.copy(
+                noteText = trimmedText,
+                updatedAt = System.currentTimeMillis()
+            )
+        )
+    }
+
+    suspend fun deleteProductNote(noteId: Int) {
+        productNoteDao?.deleteById(noteId)
+    }
 
     suspend fun recordScannedPrice(
         product: ProductCodeInfo,

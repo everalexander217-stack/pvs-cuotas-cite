@@ -203,7 +203,18 @@ data class AppStrings(
     val historyScannedEmptyHint: String,
     val historyScannedDialogTitle: String,
     val historyScannedDialogField: String,
-    val historyScannedPointLabel: (Int) -> String
+    val historyScannedPointLabel: (Int) -> String,
+    val productNotesTitle: String,
+    val productNotesSubtitle: String,
+    val productNotesCountBadge: (Int) -> String,
+    val productNotesInputHint: String,
+    val productNotesSaveBtn: String,
+    val productNotesUpdateBtn: String,
+    val productNotesEditCd: String,
+    val productNotesDeleteCd: String,
+    val productNotesEmptyTitle: String,
+    val productNotesEmptyBody: String,
+    val productNotesQuickChips: List<String>
 )
 
 val SpanishStrings = AppStrings(
@@ -418,7 +429,18 @@ val SpanishStrings = AppStrings(
     historyScannedEmptyHint = "Escanea este producto o registra precios vistos en tienda para ver tu tendencia local.",
     historyScannedDialogTitle = "Registrar precio escaneado",
     historyScannedDialogField = "Precio observado ($)",
-    historyScannedPointLabel = { n -> "Esc. #$n" }
+    historyScannedPointLabel = { n -> "Esc. #$n" },
+    productNotesTitle = "Notas del producto",
+    productNotesSubtitle = "Apuntes personales guardados en Room",
+    productNotesCountBadge = { count -> if (count == 1) "1 nota" else "$count notas" },
+    productNotesInputHint = "Ej. Garantía 2 años en tienda centro...",
+    productNotesSaveBtn = "Guardar",
+    productNotesUpdateBtn = "Actualizar",
+    productNotesEditCd = "Editar nota",
+    productNotesDeleteCd = "Eliminar nota",
+    productNotesEmptyTitle = "Sin notas todavía",
+    productNotesEmptyBody = "Anota detalles de garantía, envío o promociones de este producto para tenerlos siempre a mano.",
+    productNotesQuickChips = listOf("Garantía extendida", "Envío gratis", "Descuento en caja")
 )
 
 val EnglishStrings = AppStrings(
@@ -643,7 +665,18 @@ val EnglishStrings = AppStrings(
     historyScannedEmptyHint = "Scan this product or log store prices to build your local 5-scan trend.",
     historyScannedDialogTitle = "Log scanned price",
     historyScannedDialogField = "Observed price ($)",
-    historyScannedPointLabel = { n -> "Scan #$n" }
+    historyScannedPointLabel = { n -> "Scan #$n" },
+    productNotesTitle = "Product notes",
+    productNotesSubtitle = "Personal reminders saved locally in Room",
+    productNotesCountBadge = { count -> if (count == 1) "1 note" else "$count notes" },
+    productNotesInputHint = "E.g. 2-year warranty at downtown store...",
+    productNotesSaveBtn = "Save",
+    productNotesUpdateBtn = "Update",
+    productNotesEditCd = "Edit note",
+    productNotesDeleteCd = "Delete note",
+    productNotesEmptyTitle = "No notes yet",
+    productNotesEmptyBody = "Jot down warranty coverage, shipping promos, or store comparisons for this product.",
+    productNotesQuickChips = listOf("Extended warranty", "Free shipping", "Cash discount")
 )
 
 val LocalAppStrings = staticCompositionLocalOf { SpanishStrings }

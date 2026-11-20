@@ -1,0 +1,63 @@
+name: Compilar PVS Cuotas APK
+
+on:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-apk:
+    name: Generar APK Instalable
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Descargar código fuente
+        uses: actions/checkout@v4
+
+      - name: Configurar Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Configurar Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Preparar keystore de depuración y variables
+        run: |
+          if [ -f debug.keystore.base64 ] && [ ! -f debug.keystore ]; then
+            base64 -d debug.keystore.base64 > debug.keystore
+          fi
+          if [ ! -f .env ] && [ -f .env.example ]; then
+            cp .env.example .env
+          fi
+
+      - name: Configurar Gradle 9.3.1
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '9.3.1'
+
+      - name: Compilar APK de PVS Cuotas
+        run: gradle :app:assembleDebug --no-daemon
+
+      - name: Preparar archivo PVS-Cuotas.apk
+        run: cp app/build/outputs/apk/debug/app-debug.apk PVS-Cuotas.apk
+
+      - name: Subir APK a Artifacts de Actions
+        uses: actions/upload-artifact@v4
+        with:
+          name: PVS-Cuotas-APK
+          path: PVS-Cuotas.apk
+          retention-days: 30
+
+      - name: Publicar APK directo en Releases
+        uses: softprops/action-gh-release@v2
+        continue-on-error: true
+        with:
+          tag_name: pvs-cuotas-apk
+          name: PVS Cuotas (APK para Android)
+          body: Descarga directa de PVS-Cuotas.apk para instalar en tu teléfono Android.
+          files: PVS-Cuotas.apk
+          make_latest: true

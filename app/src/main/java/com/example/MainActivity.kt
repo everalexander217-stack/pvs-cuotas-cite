@@ -125,7 +125,8 @@ class MainActivity : ComponentActivity() {
             dao = database.installmentDao(),
             recentSearchDao = database.recentSearchDao(),
             priceTargetDao = database.priceTargetDao(),
-            scannedPriceDao = database.scannedPriceDao()
+            scannedPriceDao = database.scannedPriceDao(),
+            productNoteDao = database.productNoteDao()
         )
         val aiRepository = ProductAiRepository()
         val reminderCoordinator = WorkManagerReminderCoordinator(applicationContext)
@@ -349,6 +350,9 @@ fun PvsAppShell(
                                         viewModel.logObservedScannedPrice(product, price)
                                     },
                                     onClearScannedHistory = viewModel::clearScannedPriceHistory,
+                                    onAddProductNote = viewModel::addProductNote,
+                                    onUpdateProductNote = viewModel::updateProductNote,
+                                    onDeleteProductNote = viewModel::deleteProductNote,
                                     modifier = Modifier
                                         .weight(0.95f)
                                         .fillMaxHeight()
@@ -499,7 +503,10 @@ private fun PvsTabContent(
                 onLogScannedPrice = { product, price ->
                     viewModel.logObservedScannedPrice(product, price)
                 },
-                onClearScannedHistory = viewModel::clearScannedPriceHistory
+                onClearScannedHistory = viewModel::clearScannedPriceHistory,
+                onAddProductNote = viewModel::addProductNote,
+                onUpdateProductNote = viewModel::updateProductNote,
+                onDeleteProductNote = viewModel::deleteProductNote
             )
         }
     }
