@@ -1,0 +1,6 @@
+{
+  "name": "PVS Cuotas",
+  "description": "Gestor visual de cuotas quincenales y verificador de precios por código con identidad PVS.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
