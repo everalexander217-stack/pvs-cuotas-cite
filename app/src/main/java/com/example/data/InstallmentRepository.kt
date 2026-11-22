@@ -19,35 +19,38 @@ class InstallmentRepository(
     val productNotes: Flow<List<ProductNoteEntity>> =
         productNoteDao?.observeAll() ?: kotlinx.coroutines.flow.flowOf(emptyList())
 
-    suspend fun addProductNote(product: ProductCodeInfo, noteText: String) {
-        val noteDao = productNoteDao ?: return
+    suspend fun addProductNote(product: ProductCodeInfo, noteText: String): ProductNoteEntity? {
+        val noteDao = productNoteDao ?: return null
         val normalizedCode = product.code.trim().uppercase()
         val trimmedText = noteText.trim()
-        if (normalizedCode.isEmpty() || trimmedText.isEmpty()) return
-        noteDao.insert(
-            ProductNoteEntity(
-                productCode = normalizedCode,
-                productName = product.name,
-                noteText = trimmedText,
-                updatedAt = System.currentTimeMillis()
-            )
+        if (normalizedCode.isEmpty() || trimmedText.isEmpty()) return null
+        val entity = ProductNoteEntity(
+            productCode = normalizedCode,
+            productName = product.name,
+            noteText = trimmedText,
+            updatedAt = System.currentTimeMillis()
         )
+        val rowId = noteDao.insert(entity).toInt()
+        return entity.copy(id = rowId)
     }
 
-    suspend fun updateProductNote(note: ProductNoteEntity, newText: String) {
-        val noteDao = productNoteDao ?: return
+    suspend fun updateProductNote(note: ProductNoteEntity, newText: String): ProductNoteEntity? {
+        val noteDao = productNoteDao ?: return null
         val trimmedText = newText.trim()
-        if (trimmedText.isEmpty()) return
-        noteDao.update(
-            note.copy(
-                noteText = trimmedText,
-                updatedAt = System.currentTimeMillis()
-            )
+        if (trimmedText.isEmpty()) return null
+        val updated = note.copy(
+            noteText = trimmedText,
+            updatedAt = System.currentTimeMillis()
         )
+        noteDao.update(updated)
+        return updated
     }
 
-    suspend fun deleteProductNote(noteId: Int) {
-        productNoteDao?.deleteById(noteId)
+    suspend fun deleteProductNote(noteId: Int): ProductNoteEntity? {
+        val noteDao = productNoteDao ?: return null
+        val existing = noteDao.getById(noteId)
+        noteDao.deleteById(noteId)
+        return existing
     }
 
     suspend fun recordScannedPrice(
@@ -78,18 +81,18 @@ class InstallmentRepository(
         scannedPriceDao?.deleteAllForProduct(normalizedCode)
     }
 
-    suspend fun savePriceTarget(product: ProductCodeInfo, targetPrice: Double) {
-        val targetDao = priceTargetDao ?: return
+    suspend fun savePriceTarget(product: ProductCodeInfo, targetPrice: Double): PriceTargetEntity? {
+        val targetDao = priceTargetDao ?: return null
         val normalizedCode = product.code.trim().uppercase()
-        if (normalizedCode.isEmpty()) return
-        targetDao.upsert(
-            PriceTargetEntity(
-                code = normalizedCode,
-                productName = product.name,
-                targetPrice = targetPrice.coerceAtLeast(1.0),
-                updatedAt = System.currentTimeMillis()
-            )
+        if (normalizedCode.isEmpty()) return null
+        val entity = PriceTargetEntity(
+            code = normalizedCode,
+            productName = product.name,
+            targetPrice = targetPrice.coerceAtLeast(1.0),
+            updatedAt = System.currentTimeMillis()
         )
+        targetDao.upsert(entity)
+        return entity
     }
 
     suspend fun removePriceTarget(code: String) {
@@ -135,8 +138,8 @@ class InstallmentRepository(
         dao.updateAll(updated)
     }
 
-    suspend fun registerNextPayment(item: InstallmentEntity) {
-        if (item.isCompleted) return
+    suspend fun registerNextPayment(item: InstallmentEntity): InstallmentEntity? {
+        if (item.isCompleted) return null
         val nextPaid = (item.paidQuotas + 1).coerceAtMost(item.totalQuotas)
         val nextDate = if (nextPaid >= item.totalQuotas) {
             "Completado"
@@ -148,6 +151,7 @@ class InstallmentRepository(
             paidQuotas = nextPaid,
             nextPaymentDate = nextDate
         )
+        return item.copy(paidQuotas = nextPaid, nextPaymentDate = nextDate)
     }
 
     suspend fun addInstallment(
@@ -158,29 +162,38 @@ class InstallmentRepository(
         totalAmount: Double,
         totalQuotas: Int,
         nextPaymentDate: String
-    ) {
+    ): InstallmentEntity {
         val safeQuotas = totalQuotas.coerceAtLeast(1)
         val financed = (totalAmount - initialPaid).coerceAtLeast(0.0)
         val quotaAmount = financed / safeQuotas
         val nextSortOrder = dao.maxSortOrder() + 1
-        dao.insert(
-            InstallmentEntity(
-                title = title.trim(),
-                code = code.trim().uppercase().ifEmpty { "PVS-${10 + nextSortOrder}" },
-                category = category,
-                initialPaid = initialPaid,
-                totalAmount = totalAmount,
-                biweeklyQuota = quotaAmount,
-                totalQuotas = safeQuotas,
-                paidQuotas = 0,
-                nextPaymentDate = nextPaymentDate.ifBlank { "30 Nov 2026" },
-                sortOrder = nextSortOrder
-            )
+        val entity = InstallmentEntity(
+            title = title.trim(),
+            code = code.trim().uppercase().ifEmpty { "PVS-${10 + nextSortOrder}" },
+            category = category,
+            initialPaid = initialPaid,
+            totalAmount = totalAmount,
+            biweeklyQuota = quotaAmount,
+            totalQuotas = safeQuotas,
+            paidQuotas = 0,
+            nextPaymentDate = nextPaymentDate.ifBlank { "30 Nov 2026" },
+            sortOrder = nextSortOrder
         )
+        val rowId = dao.insert(entity).toInt()
+        return entity.copy(id = rowId)
     }
 
-    suspend fun deleteInstallment(id: Int) {
+    suspend fun updateInstallmentCategory(id: Int, category: String): InstallmentEntity? {
+        val existing = dao.getById(id) ?: return null
+        val normalized = CategoryCatalog.normalizeCategory(category)
+        dao.updateCategory(id = id, category = normalized)
+        return existing.copy(category = normalized)
+    }
+
+    suspend fun deleteInstallment(id: Int): InstallmentEntity? {
+        val existing = dao.getById(id)
         dao.deleteById(id)
+        return existing
     }
 
     fun searchProductCode(query: String): ProductCodeInfo? {

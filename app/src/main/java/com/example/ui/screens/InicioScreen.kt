@@ -58,7 +58,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.data.PriceVerdict
 import com.example.data.ProductVerifierCatalog
+import com.example.ui.components.CoachMarkStepId
+import com.example.ui.components.coachMarkTarget
 import com.example.ui.PvsUiState
+import com.example.ui.components.CategoryPieChartCard
 import com.example.ui.components.PvsCurvedWaveOverlay
 import com.example.ui.components.PvsHeaderBar
 import com.example.ui.components.formatUsd
@@ -213,7 +216,7 @@ fun InicioScreen(
                     text = strings.homeMainOptionsLabel,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
-                    color = PvsForestDark,
+                    color = MaterialTheme.colorScheme.onBackground,
                     modifier = Modifier.padding(horizontal = 4.dp)
                 )
 
@@ -229,7 +232,8 @@ fun InicioScreen(
                         haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                         onGoToScan()
                     },
-                    testTag = "home_option_scan"
+                    testTag = "home_option_scan",
+                    modifier = Modifier.coachMarkTarget(CoachMarkStepId.SCAN_ENTRY)
                 )
 
                 // Primary Option 2: Gestión de Cuotas
@@ -245,6 +249,12 @@ fun InicioScreen(
                         onGoToQuotas()
                     },
                     testTag = "home_option_quotas"
+                )
+
+                // Spending Distribution Pie Chart by Category
+                CategoryPieChartCard(
+                    installments = state.installments,
+                    onManageCategories = onGoToQuotas
                 )
 
                 // Quick Code Strip for direct 1-tap verification
@@ -301,7 +311,7 @@ fun InicioScreen(
                                         text = code,
                                         style = MaterialTheme.typography.labelLarge,
                                         fontFamily = JetBrainsMonoFontFamily,
-                                        color = PvsForestDark
+                                        color = MaterialTheme.colorScheme.onSurface
                                     )
                                 }
                             }
@@ -322,14 +332,23 @@ private fun PrimaryHubOptionCard(
     trailingBadgeIcon: ImageVector?,
     isHighlighted: Boolean,
     onClick: () -> Unit,
-    testTag: String
+    testTag: String,
+    modifier: Modifier = Modifier
 ) {
     val interactionSource = remember { MutableInteractionSource() }
-    val cardBg = if (isHighlighted) PvsMintSurface else MaterialTheme.colorScheme.surface
+    val cardBg = if (isHighlighted) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surface
     val borderColor = if (isHighlighted) PvsLeafVibrant.copy(alpha = 0.6f) else MaterialTheme.colorScheme.outline
+    val accentCircleTint = if (isHighlighted) {
+        PvsLeafBright.copy(alpha = 0.16f)
+    } else {
+        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f)
+    }
+    val secondaryContainer = MaterialTheme.colorScheme.secondaryContainer
+    val primaryContainer = MaterialTheme.colorScheme.primaryContainer
+    val onPrimaryContainer = MaterialTheme.colorScheme.onPrimaryContainer
 
     Card(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .pvsBouncyScale(interactionSource, pressedScale = 0.96f)
             .clip(RoundedCornerShape(26.dp))
@@ -348,11 +367,7 @@ private fun PrimaryHubOptionCard(
             // Subtle curved botanical circle accent in corner
             Canvas(modifier = Modifier.matchParentSize()) {
                 drawCircle(
-                    color = if (isHighlighted) {
-                        PvsLeafBright.copy(alpha = 0.16f)
-                    } else {
-                        PvsMintContainer.copy(alpha = 0.45f)
-                    },
+                    color = accentCircleTint,
                     radius = size.minDimension * 0.55f,
                     center = Offset(size.width * 0.94f, size.height * 0.16f)
                 )
@@ -373,7 +388,7 @@ private fun PrimaryHubOptionCard(
                             if (isHighlighted) {
                                 Brush.linearGradient(listOf(PvsForestDark, PvsLeafVibrant))
                             } else {
-                                Brush.linearGradient(listOf(PvsMintContainer, PvsMintSurface))
+                                Brush.linearGradient(listOf(primaryContainer, secondaryContainer))
                             }
                         ),
                     contentAlignment = Alignment.Center
@@ -381,7 +396,7 @@ private fun PrimaryHubOptionCard(
                     Icon(
                         imageVector = icon,
                         contentDescription = null,
-                        tint = if (isHighlighted) Color.White else PvsForestGreen,
+                        tint = if (isHighlighted) Color.White else onPrimaryContainer,
                         modifier = Modifier.size(28.dp)
                     )
                 }
@@ -392,7 +407,7 @@ private fun PrimaryHubOptionCard(
                 ) {
                     Surface(
                         shape = RoundedCornerShape(50),
-                        color = if (isHighlighted) PvsForestGreen.copy(alpha = 0.12f) else PvsMintContainer
+                        color = primaryContainer
                     ) {
                         Row(
                             modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
@@ -403,7 +418,7 @@ private fun PrimaryHubOptionCard(
                                 Icon(
                                     imageVector = trailingBadgeIcon,
                                     contentDescription = null,
-                                    tint = PvsForestGreen,
+                                    tint = onPrimaryContainer,
                                     modifier = Modifier.size(13.dp)
                                 )
                             }
@@ -411,7 +426,7 @@ private fun PrimaryHubOptionCard(
                                 text = badge,
                                 style = MaterialTheme.typography.labelSmall,
                                 fontWeight = FontWeight.Bold,
-                                color = PvsForestDark
+                                color = onPrimaryContainer
                             )
                         }
                     }
@@ -420,7 +435,7 @@ private fun PrimaryHubOptionCard(
                         text = title,
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
-                        color = PvsForestDark
+                        color = MaterialTheme.colorScheme.onSurface
                     )
 
                     Text(
@@ -434,13 +449,13 @@ private fun PrimaryHubOptionCard(
                     modifier = Modifier
                         .size(38.dp)
                         .clip(CircleShape)
-                        .background(if (isHighlighted) PvsForestGreen else PvsMintContainer),
+                        .background(if (isHighlighted) PvsForestGreen else primaryContainer),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Rounded.ArrowForward,
                         contentDescription = title,
-                        tint = if (isHighlighted) Color.White else PvsForestDark,
+                        tint = if (isHighlighted) Color.White else onPrimaryContainer,
                         modifier = Modifier.size(20.dp)
                     )
                 }

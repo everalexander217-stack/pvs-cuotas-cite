@@ -48,14 +48,22 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.Logout
 import androidx.compose.material.icons.outlined.HelpOutline
 import androidx.compose.material.icons.outlined.Notifications
+import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.CloudDone
+import androidx.compose.material.icons.rounded.DarkMode
 import androidx.compose.material.icons.rounded.Language
+import androidx.compose.material.icons.rounded.LightMode
 import androidx.compose.material.icons.rounded.NotificationsActive
 import androidx.compose.material.icons.rounded.NotificationsNone
 import androidx.compose.material.icons.rounded.Payments
+import androidx.compose.material.icons.rounded.TouchApp
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Button
@@ -208,7 +216,7 @@ fun PvsLanguageTogglePill(
             Icon(
                 imageVector = Icons.Rounded.Language,
                 contentDescription = "Cambiar idioma / Change language",
-                tint = PvsForestGreen,
+                tint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.size(16.dp)
             )
             Text(
@@ -216,7 +224,7 @@ fun PvsLanguageTogglePill(
                 style = MaterialTheme.typography.labelMedium,
                 fontFamily = JetBrainsMonoFontFamily,
                 fontWeight = FontWeight.Bold,
-                color = PvsForestDark
+                color = MaterialTheme.colorScheme.onSurface
             )
         }
     }
@@ -241,9 +249,12 @@ fun PvsNotificationBellButton(
         interactionSource = interactionSource,
         modifier = modifier
             .pvsBouncyScale(interactionSource, pressedScale = 0.88f)
-            .size(42.dp)
+            .size(38.dp)
             .clip(CircleShape)
-            .background(if (alertCount > 0) PvsMintSurface else MaterialTheme.colorScheme.surface)
+            .background(
+                if (alertCount > 0) MaterialTheme.colorScheme.primaryContainer
+                else MaterialTheme.colorScheme.surface
+            )
             .testTag("notifications_bell_button")
     ) {
         BadgedBox(
@@ -268,8 +279,8 @@ fun PvsNotificationBellButton(
                     Icons.Outlined.Notifications
                 },
                 contentDescription = LocalAppStrings.current.notifCenterTitle,
-                tint = if (alertCount > 0) PvsForestGreen else MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(21.dp)
+                tint = if (alertCount > 0) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(20.dp)
             )
         }
     }
@@ -353,7 +364,7 @@ fun PvsHeaderBar(
                     interactionSource = tutInteraction,
                     modifier = Modifier
                         .pvsBouncyScale(tutInteraction, pressedScale = 0.88f)
-                        .size(40.dp)
+                        .size(36.dp)
                         .clip(CircleShape)
                         .background(MaterialTheme.colorScheme.surface)
                         .testTag("replay_tutorial_button")
@@ -361,10 +372,31 @@ fun PvsHeaderBar(
                     Icon(
                         imageVector = Icons.Outlined.HelpOutline,
                         contentDescription = strings.replayTutorialCd,
-                        tint = PvsForestGreen,
-                        modifier = Modifier.size(20.dp)
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(19.dp)
                     )
                 }
+            }
+            val settingsInteraction = remember { MutableInteractionSource() }
+            IconButton(
+                onClick = {
+                    haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    onOpenNotifications()
+                },
+                interactionSource = settingsInteraction,
+                modifier = Modifier
+                    .pvsBouncyScale(settingsInteraction, pressedScale = 0.88f)
+                    .size(36.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.surface)
+                    .testTag("open_settings_button")
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Settings,
+                    contentDescription = strings.settingsOpenCd,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(19.dp)
+                )
             }
             PvsNotificationBellButton(
                 alertCount = alertCount,
@@ -420,6 +452,8 @@ fun PvsInAppNotificationBanner(
             )
             val cardInteraction = remember { MutableInteractionSource() }
 
+            val waveSurfaceTint = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.85f)
+
             Surface(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -449,7 +483,7 @@ fun PvsInAppNotificationBanner(
                             lineTo(0f, h)
                             close()
                         }
-                        drawPath(curve1, color = PvsMintSurface.copy(alpha = 0.85f))
+                        drawPath(curve1, color = waveSurfaceTint)
 
                         val arcAccent = Path().apply {
                             moveTo(w * 0.04f, h * 0.88f)
@@ -503,19 +537,19 @@ fun PvsInAppNotificationBanner(
                                 Text(
                                     text = "${strings.notifUpcomingTitle} · ${primaryAlert.installment.code}",
                                     style = MaterialTheme.typography.labelMedium,
-                                    color = PvsForestGreen,
+                                    color = MaterialTheme.colorScheme.primary,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )
                                 if (alerts.size > 1) {
                                     Surface(
                                         shape = RoundedCornerShape(50),
-                                        color = PvsMintContainer
+                                        color = MaterialTheme.colorScheme.primaryContainer
                                     ) {
                                         Text(
                                             text = strings.notifMoreCount(alerts.size - 1),
                                             style = MaterialTheme.typography.labelSmall,
-                                            color = PvsForestDark,
+                                            color = MaterialTheme.colorScheme.onPrimaryContainer,
                                             modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                                         )
                                     }
@@ -557,7 +591,7 @@ fun PvsInAppNotificationBanner(
                             Text(
                                 text = strings.notifActionReview,
                                 style = MaterialTheme.typography.labelLarge,
-                                color = PvsForestGreen
+                                color = MaterialTheme.colorScheme.primary
                             )
                         }
 
@@ -603,7 +637,13 @@ fun PvsNotificationsBottomSheet(
     onThresholdChange: (Int) -> Unit,
     onReviewInstallment: (Int) -> Unit,
     onPayInstallment: (InstallmentEntity) -> Unit,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    isDarkMode: Boolean = false,
+    onDarkModeChange: (Boolean) -> Unit = {},
+    signedInUserName: String? = null,
+    signedInUserEmail: String? = null,
+    onSignOut: (() -> Unit)? = null,
+    onStartCoachMark: (() -> Unit)? = null
 ) {
     val strings = LocalAppStrings.current
     val haptics = LocalHapticFeedback.current
@@ -634,6 +674,7 @@ fun PvsNotificationsBottomSheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
                 .padding(horizontal = 20.dp)
                 .padding(bottom = 28.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
@@ -645,14 +686,102 @@ fun PvsNotificationsBottomSheet(
                 PvsLogoMark(size = 40.dp)
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = strings.notifCenterTitle,
+                        text = strings.settingsTitle,
                         style = MaterialTheme.typography.titleLarge,
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(
-                        text = strings.notifCenterSubtitle,
+                        text = strings.settingsSubtitle,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
+            // Interface theme toggle (Light vs Dark Mode for night/low-light shifts)
+            Text(
+                text = strings.themeSectionLabel,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(20.dp),
+                color = if (isDarkMode) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant,
+                border = BorderStroke(
+                    1.dp,
+                    if (isDarkMode) PvsLeafVibrant.copy(alpha = 0.55f) else MaterialTheme.colorScheme.outline
+                )
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 14.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(
+                        modifier = Modifier.weight(1f),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(38.dp)
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(
+                                    if (isDarkMode) PvsForestDark else MaterialTheme.colorScheme.surface
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = if (isDarkMode) Icons.Rounded.DarkMode else Icons.Rounded.LightMode,
+                                contentDescription = null,
+                                tint = if (isDarkMode) PvsLeafBright else PvsForestGreen,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                        Column(modifier = Modifier.weight(1f)) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Text(
+                                    text = strings.themeToggleTitle,
+                                    style = MaterialTheme.typography.titleSmall,
+                                    color = if (isDarkMode) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
+                                )
+                                Surface(
+                                    shape = RoundedCornerShape(50),
+                                    color = MaterialTheme.colorScheme.surface
+                                ) {
+                                    Text(
+                                        text = if (isDarkMode) strings.themeDarkBadge else strings.themeLightBadge,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp)
+                                    )
+                                }
+                            }
+                            Text(
+                                text = strings.themeToggleSubtitle,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = if (isDarkMode) MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.85f) else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Switch(
+                        checked = isDarkMode,
+                        onCheckedChange = { checked ->
+                            haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            onDarkModeChange(checked)
+                        },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = Color.White,
+                            checkedTrackColor = PvsLeafVibrant
+                        ),
+                        modifier = Modifier.testTag("dark_mode_switch")
                     )
                 }
             }
@@ -661,7 +790,7 @@ fun PvsNotificationsBottomSheet(
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(20.dp),
-                color = if (notificationsEnabled) PvsMintSurface else MaterialTheme.colorScheme.surfaceVariant,
+                color = if (notificationsEnabled) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f) else MaterialTheme.colorScheme.surfaceVariant,
                 border = BorderStroke(
                     1.dp,
                     if (notificationsEnabled) PvsLeafVibrant.copy(alpha = 0.45f) else MaterialTheme.colorScheme.outline
@@ -678,7 +807,7 @@ fun PvsNotificationsBottomSheet(
                         Text(
                             text = strings.notifSystemToggleTitle,
                             style = MaterialTheme.typography.titleSmall,
-                            color = PvsForestDark
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
                             text = strings.notifSystemToggleSubtitle,
@@ -724,7 +853,7 @@ fun PvsNotificationsBottomSheet(
                         Text(
                             text = strings.notifPermissionNeededTitle,
                             style = MaterialTheme.typography.titleSmall,
-                            color = PvsForestDark
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
                             text = strings.notifPermissionNeededBody,
@@ -807,7 +936,7 @@ fun PvsNotificationsBottomSheet(
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(20.dp),
-                    color = PvsMintSurface
+                    color = MaterialTheme.colorScheme.secondaryContainer
                 ) {
                     Column(
                         modifier = Modifier.padding(20.dp),
@@ -816,13 +945,13 @@ fun PvsNotificationsBottomSheet(
                         Text(
                             text = strings.notifEmptyTitle,
                             style = MaterialTheme.typography.titleMedium,
-                            color = PvsForestDark
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
                             text = strings.notifEmptyBody(thresholdDays),
                             style = MaterialTheme.typography.bodySmall,
-                            color = PvsForestGreen
+                            color = MaterialTheme.colorScheme.primary
                         )
                     }
                 }
@@ -968,8 +1097,100 @@ fun PvsNotificationsBottomSheet(
                 Text(
                     text = testFeedback!!,
                     style = MaterialTheme.typography.bodySmall,
-                    color = PvsForestGreen
+                    color = MaterialTheme.colorScheme.primary
                 )
+            }
+
+            if (onStartCoachMark != null) {
+                val coachInteraction = remember { MutableInteractionSource() }
+                OutlinedButton(
+                    onClick = {
+                        haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        onStartCoachMark()
+                    },
+                    interactionSource = coachInteraction,
+                    shape = RoundedCornerShape(16.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .pvsBouncyScale(coachInteraction)
+                        .testTag("start_coach_mark_button")
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.TouchApp,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(strings.coachMarkReplayBtn)
+                }
+            }
+
+            if (signedInUserName != null && onSignOut != null) {
+                Text(
+                    text = strings.accountSectionTitle,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(20.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 14.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Rounded.CloudDone,
+                                    contentDescription = null,
+                                    tint = PvsLeafVibrant,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Text(
+                                    text = strings.accountSyncActiveBadge,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                            Text(
+                                text = strings.accountSignedInAs(signedInUserName),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            if (!signedInUserEmail.isNullOrBlank()) {
+                                Text(
+                                    text = signedInUserEmail,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        OutlinedButton(
+                            onClick = onSignOut,
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.testTag("sign_out_button")
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Rounded.Logout,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(strings.accountSignOutBtn)
+                        }
+                    }
+                }
             }
         }
     }
@@ -1030,7 +1251,7 @@ fun AnimatedQuotaProgressBar(
     progress: Float,
     modifier: Modifier = Modifier,
     height: Dp = 10.dp,
-    trackColor: Color = PvsMintSurface
+    trackColor: Color = MaterialTheme.colorScheme.secondaryContainer
 ) {
     val animatedProgress by animateFloatAsState(
         targetValue = progress.coerceIn(0f, 1f),
@@ -1164,8 +1385,8 @@ private fun SemaphoreBulb(
 fun CodePillBadge(
     code: String,
     modifier: Modifier = Modifier,
-    containerColor: Color = PvsMintContainer,
-    contentColor: Color = PvsForestDark
+    containerColor: Color = MaterialTheme.colorScheme.primaryContainer,
+    contentColor: Color = MaterialTheme.colorScheme.onPrimaryContainer
 ) {
     Surface(
         modifier = modifier,

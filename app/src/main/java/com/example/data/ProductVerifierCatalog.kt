@@ -115,14 +115,36 @@ object ProductVerifierCatalog {
     )
 
     fun findByQuery(rawQuery: String): ProductCodeInfo? {
-        val normalized = rawQuery.trim().uppercase()
-        if (normalized.isEmpty()) return null
+        val trimmed = rawQuery.trim()
+        if (trimmed.isEmpty()) return null
+        lookupByBarcodeOrCode(trimmed)?.let { return it }
+        return catalog.firstOrNull { item ->
+            item.name.contains(trimmed, ignoreCase = true)
+        }
+    }
+
+    private fun lookupByBarcodeOrCode(raw: String): ProductCodeInfo? {
+        val trimmed = raw.trim()
+        retailBarcodeMap[trimmed]?.let { mappedCode ->
+            catalog.firstOrNull { it.code.equals(mappedCode, ignoreCase = true) }?.let { return it }
+        }
+        val digitsOnly = trimmed.filter { it.isDigit() }
+        if (digitsOnly.length >= 8) {
+            retailBarcodeMap.entries.firstOrNull { (ean, _) ->
+                ean == digitsOnly ||
+                    ean.trimStart('0') == digitsOnly.trimStart('0')
+            }?.value?.let { mappedCode ->
+                catalog.firstOrNull { it.code.equals(mappedCode, ignoreCase = true) }?.let { return it }
+            }
+        }
+        val normalized = trimmed.uppercase()
         val compact = normalized.replace("-", "").replace(" ", "")
         return catalog.firstOrNull { item ->
-            val itemCodeCompact = item.code.uppercase().replace("-", "")
-            item.code.equals(normalized, ignoreCase = true) ||
+            val itemCodeUpper = item.code.uppercase()
+            val itemCodeCompact = itemCodeUpper.replace("-", "")
+            itemCodeUpper == normalized ||
                 itemCodeCompact == compact ||
-                item.name.contains(rawQuery.trim(), ignoreCase = true)
+                normalized.contains(itemCodeUpper)
         }
     }
 
@@ -135,19 +157,77 @@ object ProductVerifierCatalog {
         "7501001000208" to "CAF-02"
     )
 
+    fun retailBarcodeFor(code: String): String? {
+        val normalized = code.trim().uppercase()
+        return retailBarcodeMap.entries.firstOrNull { it.value.equals(normalized, ignoreCase = true) }?.key
+    }
+
+    fun autocompleteSuggestions(
+        rawQuery: String,
+        recentSearches: List<RecentSearchEntity> = emptyList(),
+        limit: Int = 5
+    ): List<ProductAutocompleteSuggestion> {
+        val trimmed = rawQuery.trim()
+        val recentCodes = recentSearches.map { it.code.uppercase() }.toSet()
+
+        if (trimmed.isEmpty()) {
+            val orderedCodes = (recentSearches.map { it.code } + featuredCodes + catalog.map { it.code })
+                .distinctBy { it.uppercase() }
+            return orderedCodes
+                .mapNotNull { code -> catalog.firstOrNull { it.code.equals(code, ignoreCase = true) } }
+                .take(limit)
+                .map { item ->
+                    ProductAutocompleteSuggestion(
+                        product = item,
+                        barcode = retailBarcodeFor(item.code),
+                        isRecent = item.code.uppercase() in recentCodes
+                    )
+                }
+        }
+
+        val upper = trimmed.uppercase()
+        val compact = upper.replace("-", "").replace(" ", "")
+
+        return catalog
+            .mapNotNull { item ->
+                val itemCodeUpper = item.code.uppercase()
+                val itemCodeCompact = itemCodeUpper.replace("-", "")
+                val barcode = retailBarcodeFor(item.code)
+
+                val score = when {
+                    itemCodeUpper == upper || itemCodeCompact == compact -> 100
+                    itemCodeUpper.startsWith(upper) || itemCodeCompact.startsWith(compact) -> 90
+                    barcode != null && barcode.startsWith(trimmed) -> 85
+                    itemCodeUpper.contains(upper) || itemCodeCompact.contains(compact) -> 75
+                    item.name.contains(trimmed, ignoreCase = true) -> 60
+                    item.category.contains(trimmed, ignoreCase = true) -> 45
+                    barcode != null && barcode.contains(trimmed) -> 40
+                    else -> 0
+                }
+                if (score == 0) {
+                    null
+                } else {
+                    val recencyBoost = if (itemCodeUpper in recentCodes) 5 else 0
+                    (score + recencyBoost) to ProductAutocompleteSuggestion(
+                        product = item,
+                        barcode = barcode,
+                        isRecent = itemCodeUpper in recentCodes
+                    )
+                }
+            }
+            .sortedByDescending { it.first }
+            .take(limit)
+            .map { it.second }
+    }
+
     fun resolveBarcodeValue(rawBarcode: String): String {
         val trimmed = rawBarcode.trim()
         if (trimmed.isEmpty()) return ""
-        retailBarcodeMap[trimmed]?.let { return it }
-
-        val upper = trimmed.uppercase()
-        catalog.firstOrNull { product ->
-            val codeCompact = product.code.uppercase().replace("-", "")
-            upper == product.code.uppercase() ||
-                upper.replace("-", "") == codeCompact ||
-                upper.contains(product.code.uppercase())
-        }?.let { return it.code }
-
+        lookupByBarcodeOrCode(trimmed)?.let { return it.code }
+        val digitsOnly = trimmed.filter { it.isDigit() }
+        if (digitsOnly.length >= 8 && trimmed.all { it.isDigit() || it == '-' || it == ' ' }) {
+            return digitsOnly
+        }
         return trimmed
     }
 
@@ -233,5 +313,11 @@ data class PriceHistoryPoint(
     val labelEn: String,
     val storePrice: Double,
     val marketAvgPrice: Double
+)
+
+data class ProductAutocompleteSuggestion(
+    val product: ProductCodeInfo,
+    val barcode: String? = null,
+    val isRecent: Boolean = false
 )
 

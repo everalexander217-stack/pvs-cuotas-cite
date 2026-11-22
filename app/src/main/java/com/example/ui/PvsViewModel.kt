@@ -6,7 +6,11 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.ai.AiAnalysisUiState
 import com.example.ai.AiProductAnalysis
+import com.example.ai.ChatStreamEvent
+import com.example.ai.ChatTurn
 import com.example.ai.ProductAiRepository
+import com.example.ai.PvsAssistantRepository
+import com.example.data.CategoryCatalog
 import com.example.data.DueDateUtils
 import com.example.data.InstallmentEntity
 import com.example.data.InstallmentRepository
@@ -17,13 +21,18 @@ import com.example.data.ProductNoteEntity
 import com.example.data.ProductVerifierCatalog
 import com.example.data.RecentSearchEntity
 import com.example.data.ScannedPriceEntity
+import com.example.data.cloud.FirestoreSyncRepository
 import com.example.notifications.QuotaNotificationHelper
 import com.example.notifications.QuotaReminderCoordinator
+import com.example.ui.components.CoachMarkStepId
 import com.example.ui.theme.AppLanguage
+import com.google.firebase.firestore.FirebaseFirestoreException
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -32,7 +41,8 @@ import kotlinx.coroutines.launch
 enum class PvsTab {
     INICIO,
     VERIFICADOR,
-    MIS_CUOTAS
+    MIS_CUOTAS,
+    ASISTENTE
 }
 
 data class PvsUiState(
@@ -47,6 +57,7 @@ data class PvsUiState(
     val aiAnalysisState: AiAnalysisUiState = AiAnalysisUiState.Idle,
     val showAddDialog: Boolean = false,
     val language: AppLanguage = AppLanguage.ES,
+    val isDarkMode: Boolean = false,
     val notificationsEnabled: Boolean = true,
     val alertThresholdDays: Int = 3,
     val upcomingAlerts: List<PaymentAlert> = emptyList(),
@@ -55,7 +66,19 @@ data class PvsUiState(
     val lastScannedBarcode: String? = null,
     val priceTargets: Map<String, PriceTargetEntity> = emptyMap(),
     val scannedPriceHistory: Map<String, List<ScannedPriceEntity>> = emptyMap(),
-    val productNotes: Map<String, List<ProductNoteEntity>> = emptyMap()
+    val productNotes: Map<String, List<ProductNoteEntity>> = emptyMap(),
+    val chatMessages: List<ChatTurn> = emptyList(),
+    val streamingChatText: String = "",
+    val isChatBusy: Boolean = false,
+    val chatError: String? = null,
+    val chatSearchGroundingEnabled: Boolean = true,
+    val chatVoiceReadout: Boolean = false,
+    val signedInUserName: String? = null,
+    val signedInUserEmail: String? = null,
+    val cloudSyncError: String? = null,
+    val coachMarkActive: Boolean = false,
+    val coachMarkStepIndex: Int = 0,
+    val availableCategories: List<String> = CategoryCatalog.defaultPresets
 ) {
     val activeInstallments: List<InstallmentEntity>
         get() = installments.filter { !it.isCompleted }
@@ -81,18 +104,34 @@ data class PvsUiState(
 
 private data class PreferenceUiSlice(
     val language: AppLanguage = AppLanguage.ES,
+    val darkModeEnabled: Boolean = false,
     val notificationsEnabled: Boolean = true,
     val alertThresholdDays: Int = 3,
     val isBannerDismissed: Boolean = false,
     val showNotificationsSheet: Boolean = false,
-    val availableMoney: Double = 250.0
+    val availableMoney: Double = 250.0,
+    val coachMarkActive: Boolean = false,
+    val coachMarkStepIndex: Int = 0
+)
+
+private data class ChatUiSlice(
+    val messages: List<ChatTurn> = emptyList(),
+    val streamingText: String = "",
+    val busy: Boolean = false,
+    val error: String? = null,
+    val searchGroundingEnabled: Boolean = true,
+    val voiceReadoutEnabled: Boolean = false
 )
 
 class PvsViewModel(
     private val repository: InstallmentRepository,
     private val aiRepository: ProductAiRepository = ProductAiRepository(),
     private val sharedPrefs: SharedPreferences? = null,
-    private val reminderCoordinator: QuotaReminderCoordinator? = null
+    private val reminderCoordinator: QuotaReminderCoordinator? = null,
+    private val firestoreSyncRepository: FirestoreSyncRepository? = null,
+    private val assistantRepository: PvsAssistantRepository? = null,
+    private val signedInUserName: String? = null,
+    private val signedInUserEmail: String? = null
 ) : ViewModel() {
 
     private val _selectedTab = MutableStateFlow(PvsTab.INICIO)
@@ -105,9 +144,12 @@ class PvsViewModel(
     private val _isLoaded = MutableStateFlow(false)
     private val _prefs = MutableStateFlow(loadInitialPreferences(sharedPrefs))
     private val _lastScannedBarcode = MutableStateFlow<String?>(null)
+    private val _chatSlice = MutableStateFlow(ChatUiSlice())
+    private val _cloudSyncError = MutableStateFlow<String?>(null)
 
     private val aiCache = mutableMapOf<String, AiProductAnalysis>()
     private var aiJob: Job? = null
+    private var chatJob: Job? = null
 
     init {
         viewModelScope.launch {
@@ -123,6 +165,73 @@ class PvsViewModel(
                 thresholdDays = currentPrefs.alertThresholdDays,
                 triggerImmediateCheck = currentPrefs.notificationsEnabled
             )
+
+            // Ensure authenticated user profile & initial cloud sync when Firestore is configured
+            firestoreSyncRepository?.let { cloud ->
+                val result = cloud.ensureUserProfile(
+                    displayName = signedInUserName ?: "Usuario PVS",
+                    email = signedInUserEmail,
+                    darkMode = currentPrefs.darkModeEnabled,
+                    language = currentPrefs.language
+                )
+                result.onFailure { err ->
+                    _cloudSyncError.value = err.localizedMessage
+                }
+                repository.getAllInstallments().forEach { item ->
+                    cloud.syncInstallment(item)
+                }
+            }
+        }
+
+        // Observe Cloud Firestore user profile & chat history if signed in
+        firestoreSyncRepository?.let { cloud ->
+            viewModelScope.launch {
+                cloud.observeUserProfile()
+                    .catch { error ->
+                        val firestoreError = generateSequence(error) { it.cause }
+                            .filterIsInstance<FirebaseFirestoreException>()
+                            .firstOrNull()
+                        if (firestoreError == null && error is CancellationException) throw error
+                        _cloudSyncError.value = (firestoreError ?: error).message
+                    }
+                    .collect { profile ->
+                        if (profile != null) {
+                            val cloudDark = profile.preferredTheme == "dark"
+                            if (cloudDark != _prefs.value.darkModeEnabled &&
+                                sharedPrefs?.contains(QuotaNotificationHelper.KEY_DARK_MODE) != true
+                            ) {
+                                sharedPrefs?.edit()?.putBoolean(QuotaNotificationHelper.KEY_DARK_MODE, cloudDark)?.apply()
+                                _prefs.update { it.copy(darkModeEnabled = cloudDark) }
+                            }
+                        }
+                    }
+            }
+
+            viewModelScope.launch {
+                cloud.observeChatMessages()
+                    .catch { error ->
+                        val firestoreError = generateSequence(error) { it.cause }
+                            .filterIsInstance<FirebaseFirestoreException>()
+                            .firstOrNull()
+                        if (firestoreError == null && error is CancellationException) throw error
+                        val rootError = firestoreError ?: error
+                        _chatSlice.update { it.copy(error = rootError.message ?: "Error al sincronizar chat") }
+                    }
+                    .collect { cloudMessages ->
+                        val turns = cloudMessages.map { msg ->
+                            ChatTurn(
+                                id = msg.id.ifBlank { "turn_${msg.hashCode()}" },
+                                role = msg.role,
+                                text = msg.text,
+                                audioTranscript = msg.audioTranscript,
+                                groundingNote = msg.groundingNote
+                            )
+                        }
+                        if (turns.isNotEmpty() || _chatSlice.value.messages.isEmpty()) {
+                            _chatSlice.update { it.copy(messages = turns) }
+                        }
+                    }
+            }
         }
     }
 
@@ -141,7 +250,9 @@ class PvsViewModel(
         _lastScannedBarcode,
         repository.priceTargets,
         repository.scannedPrices,
-        repository.productNotes
+        repository.productNotes,
+        _chatSlice,
+        _cloudSyncError
     ) { values ->
         @Suppress("UNCHECKED_CAST")
         val tab = values[0] as PvsTab
@@ -166,6 +277,8 @@ class PvsViewModel(
         val scannedPricesList = values[13] as List<ScannedPriceEntity>
         @Suppress("UNCHECKED_CAST")
         val notesList = values[14] as List<ProductNoteEntity>
+        val chat = values[15] as ChatUiSlice
+        val cloudError = values[16] as String?
 
         val displayedList = optimistic ?: dbList
         val alerts = DueDateUtils.computeUpcomingAlerts(
@@ -187,6 +300,7 @@ class PvsViewModel(
             aiAnalysisState = aiState,
             showAddDialog = showAdd,
             language = prefs.language,
+            isDarkMode = prefs.darkModeEnabled,
             notificationsEnabled = prefs.notificationsEnabled,
             alertThresholdDays = prefs.alertThresholdDays,
             upcomingAlerts = alerts,
@@ -197,7 +311,19 @@ class PvsViewModel(
             scannedPriceHistory = scannedPricesList
                 .groupBy { it.productCode.uppercase() }
                 .mapValues { (_, items) -> items.takeLast(5) },
-            productNotes = notesList.groupBy { it.productCode.uppercase() }
+            productNotes = notesList.groupBy { it.productCode.uppercase() },
+            chatMessages = chat.messages,
+            streamingChatText = chat.streamingText,
+            isChatBusy = chat.busy,
+            chatError = chat.error,
+            chatSearchGroundingEnabled = chat.searchGroundingEnabled,
+            chatVoiceReadout = chat.voiceReadoutEnabled,
+            signedInUserName = signedInUserName,
+            signedInUserEmail = signedInUserEmail,
+            cloudSyncError = cloudError,
+            coachMarkActive = prefs.coachMarkActive,
+            coachMarkStepIndex = prefs.coachMarkStepIndex,
+            availableCategories = CategoryCatalog.collectAvailableCategories(displayedList)
         )
     }.stateIn(
         scope = viewModelScope,
@@ -205,21 +331,99 @@ class PvsViewModel(
         initialValue = PvsUiState()
     )
 
+    // --- Theme (Light / Night Dark Mode) ---
+
+    fun setDarkMode(enabled: Boolean) {
+        sharedPrefs?.edit()
+            ?.putBoolean(QuotaNotificationHelper.KEY_DARK_MODE, enabled)
+            ?.apply()
+        _prefs.update { it.copy(darkModeEnabled = enabled) }
+        viewModelScope.launch {
+            firestoreSyncRepository?.updateThemePreference(enabled)
+        }
+    }
+
+    fun toggleDarkMode() {
+        setDarkMode(!_prefs.value.darkModeEnabled)
+    }
+
+    // --- Interactive Coach Mark Tutorial Layer ---
+
+    fun startCoachMarks() {
+        _selectedTab.value = tabForCoachMarkStep(0)
+        _prefs.update {
+            it.copy(
+                showNotificationsSheet = false,
+                coachMarkActive = true,
+                coachMarkStepIndex = 0
+            )
+        }
+    }
+
+    fun nextCoachMarkStep() {
+        val current = _prefs.value.coachMarkStepIndex
+        val lastIndex = CoachMarkStepId.entries.lastIndex
+        if (current >= lastIndex) {
+            dismissCoachMarks()
+        } else {
+            val next = current + 1
+            _selectedTab.value = tabForCoachMarkStep(next)
+            _prefs.update { it.copy(coachMarkActive = true, coachMarkStepIndex = next) }
+        }
+    }
+
+    fun previousCoachMarkStep() {
+        val current = _prefs.value.coachMarkStepIndex
+        if (current > 0) {
+            val prev = current - 1
+            _selectedTab.value = tabForCoachMarkStep(prev)
+            _prefs.update { it.copy(coachMarkActive = true, coachMarkStepIndex = prev) }
+        }
+    }
+
+    fun dismissCoachMarks() {
+        sharedPrefs?.edit()
+            ?.putBoolean(QuotaNotificationHelper.KEY_COACH_MARK_COMPLETED, true)
+            ?.apply()
+        _prefs.update { it.copy(coachMarkActive = false, coachMarkStepIndex = 0) }
+    }
+
+    private fun tabForCoachMarkStep(index: Int): PvsTab {
+        val step = CoachMarkStepId.entries.getOrElse(index) { CoachMarkStepId.SCAN_ENTRY }
+        return when (step) {
+            CoachMarkStepId.SCAN_ENTRY -> PvsTab.INICIO
+            CoachMarkStepId.SCAN_BUTTON -> PvsTab.VERIFICADOR
+            CoachMarkStepId.ADD_QUOTA_BUTTON -> PvsTab.MIS_CUOTAS
+            CoachMarkStepId.QUICK_SCAN_TO_QUOTA -> PvsTab.MIS_CUOTAS
+        }
+    }
+
+    // --- Product Notes, Price Targets & Installments (Room + Cloud Sync) ---
+
     fun addProductNote(product: ProductCodeInfo, noteText: String) {
         viewModelScope.launch {
-            repository.addProductNote(product, noteText)
+            val created = repository.addProductNote(product, noteText)
+            if (created != null) {
+                firestoreSyncRepository?.syncProductNote(created)
+            }
         }
     }
 
     fun updateProductNote(note: ProductNoteEntity, newText: String) {
         viewModelScope.launch {
-            repository.updateProductNote(note, newText)
+            val updated = repository.updateProductNote(note, newText)
+            if (updated != null) {
+                firestoreSyncRepository?.syncProductNote(updated)
+            }
         }
     }
 
     fun deleteProductNote(noteId: Int) {
         viewModelScope.launch {
-            repository.deleteProductNote(noteId)
+            val deleted = repository.deleteProductNote(noteId)
+            if (deleted != null) {
+                firestoreSyncRepository?.deleteProductNote(deleted.id, deleted.productCode)
+            }
         }
     }
 
@@ -241,13 +445,17 @@ class PvsViewModel(
 
     fun setPriceTarget(product: ProductCodeInfo, targetPrice: Double) {
         viewModelScope.launch {
-            repository.savePriceTarget(product, targetPrice)
+            val saved = repository.savePriceTarget(product, targetPrice)
+            if (saved != null) {
+                firestoreSyncRepository?.syncPriceTarget(saved)
+            }
         }
     }
 
     fun clearPriceTarget(code: String) {
         viewModelScope.launch {
             repository.removePriceTarget(code)
+            firestoreSyncRepository?.deletePriceTarget(code)
         }
     }
 
@@ -269,6 +477,9 @@ class PvsViewModel(
         val next = if (_prefs.value.language == AppLanguage.ES) AppLanguage.EN else AppLanguage.ES
         sharedPrefs?.edit()?.putString(QuotaNotificationHelper.KEY_APP_LANGUAGE, next.shortCode)?.apply()
         _prefs.update { it.copy(language = next) }
+        viewModelScope.launch {
+            firestoreSyncRepository?.updateLanguagePreference(next)
+        }
         val active = uiState.value.verifiedProduct
         val shouldAnalyze = _selectedTab.value == PvsTab.VERIFICADOR ||
             _aiAnalysisState.value !is AiAnalysisUiState.Idle
@@ -382,6 +593,9 @@ class PvsViewModel(
         viewModelScope.launch {
             repository.persistOrder(current)
             _optimisticOrder.value = null
+            current.forEachIndexed { idx, item ->
+                firestoreSyncRepository?.syncInstallment(item.copy(sortOrder = idx))
+            }
         }
     }
 
@@ -395,21 +609,39 @@ class PvsViewModel(
         list.add(target, item)
         viewModelScope.launch {
             repository.persistOrder(list)
+            list.forEachIndexed { idx, entry ->
+                firestoreSyncRepository?.syncInstallment(entry.copy(sortOrder = idx))
+            }
         }
     }
 
     fun registerPayment(item: InstallmentEntity) {
         viewModelScope.launch {
-            repository.registerNextPayment(item)
+            val updated = repository.registerNextPayment(item)
+            if (updated != null) {
+                firestoreSyncRepository?.syncInstallment(updated)
+            }
             if (_prefs.value.notificationsEnabled) {
                 reminderCoordinator?.checkNow(force = false)
             }
         }
     }
 
+    fun updateInstallmentCategory(installmentId: Int, category: String) {
+        viewModelScope.launch {
+            val updated = repository.updateInstallmentCategory(installmentId, category)
+            if (updated != null) {
+                firestoreSyncRepository?.syncInstallment(updated)
+            }
+        }
+    }
+
     fun deleteInstallment(id: Int) {
         viewModelScope.launch {
-            repository.deleteInstallment(id)
+            val deleted = repository.deleteInstallment(id)
+            if (deleted != null) {
+                firestoreSyncRepository?.deleteInstallment(deleted)
+            }
             _expandedIds.update { it - id }
             if (_prefs.value.notificationsEnabled) {
                 reminderCoordinator?.checkNow(force = false)
@@ -420,6 +652,9 @@ class PvsViewModel(
     fun restoreDefaults() {
         viewModelScope.launch {
             repository.restoreDefaultsIfEmpty()
+            repository.getAllInstallments().forEach { item ->
+                firestoreSyncRepository?.syncInstallment(item)
+            }
             if (_prefs.value.notificationsEnabled) {
                 reminderCoordinator?.checkNow(force = false)
             }
@@ -440,7 +675,7 @@ class PvsViewModel(
         nextPaymentDate: String
     ) {
         viewModelScope.launch {
-            repository.addInstallment(
+            val created = repository.addInstallment(
                 title = title,
                 code = code,
                 category = category,
@@ -449,6 +684,7 @@ class PvsViewModel(
                 totalQuotas = totalQuotas,
                 nextPaymentDate = nextPaymentDate
             )
+            firestoreSyncRepository?.syncInstallment(created)
             _showAddDialog.value = false
             if (_prefs.value.notificationsEnabled) {
                 reminderCoordinator?.checkNow(force = false)
@@ -561,7 +797,7 @@ class PvsViewModel(
 
     fun addVerifiedProductToCuotas(product: ProductCodeInfo) {
         viewModelScope.launch {
-            repository.addInstallment(
+            val created = repository.addInstallment(
                 title = product.name,
                 code = product.code,
                 category = product.category,
@@ -570,10 +806,184 @@ class PvsViewModel(
                 totalQuotas = product.quotasCount,
                 nextPaymentDate = DueDateUtils.formatDateOffsetFromToday(3)
             )
+            firestoreSyncRepository?.syncInstallment(created)
             if (_prefs.value.notificationsEnabled) {
                 reminderCoordinator?.checkNow(force = false)
             }
         }
+    }
+
+    // --- Gemini Multi-Turn Chatbot + Audio Transcription + Search Grounding ---
+
+    fun setChatSearchGrounding(enabled: Boolean) {
+        _chatSlice.update { it.copy(searchGroundingEnabled = enabled) }
+    }
+
+    fun setChatVoiceReadout(enabled: Boolean) {
+        _chatSlice.update { it.copy(voiceReadoutEnabled = enabled) }
+    }
+
+    fun dismissChatError() {
+        _chatSlice.update { it.copy(error = null) }
+    }
+
+    fun clearChatHistory() {
+        val ids = _chatSlice.value.messages.map { it.id }
+        chatJob?.cancel()
+        _chatSlice.update {
+            it.copy(
+                messages = emptyList(),
+                streamingText = "",
+                busy = false,
+                error = null
+            )
+        }
+        viewModelScope.launch {
+            firestoreSyncRepository?.clearChatHistory(ids)
+        }
+    }
+
+    fun sendChatMessage(message: String) {
+        val trimmed = message.trim()
+        if (trimmed.isEmpty()) return
+        val assistant = assistantRepository ?: PvsAssistantRepository()
+        val lang = _prefs.value.language
+        val snapshotHistory = _chatSlice.value.messages
+        val userTurn = ChatTurn(
+            id = "local_u_${System.currentTimeMillis()}",
+            role = "user",
+            text = trimmed
+        )
+
+        _chatSlice.update {
+            it.copy(
+                messages = it.messages + userTurn,
+                streamingText = "",
+                busy = true,
+                error = null
+            )
+        }
+
+        chatJob?.cancel()
+        chatJob = viewModelScope.launch {
+            firestoreSyncRepository?.addChatMessage(role = "user", text = trimmed)
+            try {
+                assistant.sendChatMessageStream(
+                    history = snapshotHistory,
+                    userMessage = trimmed,
+                    useSearchGrounding = _chatSlice.value.searchGroundingEnabled,
+                    contextSummary = buildFinancialContextSummary(),
+                    language = lang
+                ).collect { event ->
+                    when (event) {
+                        is ChatStreamEvent.Chunk -> {
+                            _chatSlice.update { it.copy(streamingText = event.accumulatedText) }
+                        }
+                        is ChatStreamEvent.Completed -> {
+                            val modelTurn = ChatTurn(
+                                id = "local_m_${System.currentTimeMillis()}",
+                                role = "model",
+                                text = event.finalText,
+                                groundingNote = event.groundingNote
+                            )
+                            _chatSlice.update { slice ->
+                                slice.copy(
+                                    messages = slice.messages + modelTurn,
+                                    streamingText = "",
+                                    busy = false
+                                )
+                            }
+                            firestoreSyncRepository?.addChatMessage(
+                                role = "model",
+                                text = event.finalText,
+                                groundingNote = event.groundingNote
+                            )
+                        }
+                    }
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _chatSlice.update {
+                    it.copy(
+                        streamingText = "",
+                        busy = false,
+                        error = e.localizedMessage ?: "Error en el asistente."
+                    )
+                }
+            }
+        }
+    }
+
+    fun sendVoiceAudio(audioBytes: ByteArray, transcribeOnly: Boolean) {
+        val assistant = assistantRepository ?: PvsAssistantRepository()
+        val lang = _prefs.value.language
+
+        _chatSlice.update {
+            it.copy(busy = true, error = null, streamingText = "")
+        }
+
+        chatJob?.cancel()
+        chatJob = viewModelScope.launch {
+            val result = assistant.transcribeAndProcessAudio(
+                audioBytes = audioBytes,
+                mimeType = "audio/mp4",
+                transcribeOnly = transcribeOnly,
+                contextSummary = buildFinancialContextSummary(),
+                language = lang
+            )
+            result.fold(
+                onSuccess = { outcome ->
+                    val userTurn = ChatTurn(
+                        id = "local_vu_${System.currentTimeMillis()}",
+                        role = "user",
+                        text = outcome.transcript,
+                        audioTranscript = outcome.transcript
+                    )
+                    val modelTurn = ChatTurn(
+                        id = "local_vm_${System.currentTimeMillis()}",
+                        role = "model",
+                        text = outcome.assistantReply
+                    )
+                    _chatSlice.update { slice ->
+                        slice.copy(
+                            messages = slice.messages + userTurn + modelTurn,
+                            busy = false
+                        )
+                    }
+                    firestoreSyncRepository?.addChatMessage(
+                        role = "user",
+                        text = outcome.transcript,
+                        audioTranscript = outcome.transcript
+                    )
+                    firestoreSyncRepository?.addChatMessage(
+                        role = "model",
+                        text = outcome.assistantReply
+                    )
+                },
+                onFailure = { error ->
+                    _chatSlice.update {
+                        it.copy(
+                            busy = false,
+                            error = error.message ?: "No se pudo procesar el audio."
+                        )
+                    }
+                }
+            )
+        }
+    }
+
+    private fun buildFinancialContextSummary(): String {
+        val snapshot = uiState.value
+        val activeCount = snapshot.activeInstallments.size
+        val activeList = snapshot.activeInstallments.take(4).joinToString(", ") {
+            "${it.code}: ${it.title} (\$${String.format(java.util.Locale.US, "%.2f", it.biweeklyQuota)}/qna)"
+        }
+        val checkedProduct = snapshot.verifiedProduct?.let {
+            "Producto en visor: ${it.code} (${it.name}, tienda \$${it.storePrice}, promedio \$${it.averagePrice})"
+        } ?: "Ningún producto en visor"
+        return "Disponible quincenal: \$${snapshot.availableMoney}, Comprometido: \$${snapshot.totalQuincena}, " +
+            "Libre: \$${snapshot.freeMoney}, Planes activos ($activeCount): [$activeList]. $checkedProduct."
     }
 
     private fun analyzeKnownProduct(
@@ -641,14 +1051,19 @@ class PvsViewModel(
         if (prefs == null) return PreferenceUiSlice()
         val langCode = prefs.getString(QuotaNotificationHelper.KEY_APP_LANGUAGE, AppLanguage.ES.shortCode)
         val language = if (langCode == AppLanguage.EN.shortCode) AppLanguage.EN else AppLanguage.ES
+        val darkMode = prefs.getBoolean(QuotaNotificationHelper.KEY_DARK_MODE, false)
         val notificationsEnabled = prefs.getBoolean(QuotaNotificationHelper.KEY_NOTIFICATIONS_ENABLED, true)
         val thresholdDays = prefs.getInt(QuotaNotificationHelper.KEY_ALERT_THRESHOLD_DAYS, 3).coerceIn(1, 14)
         val availableMoney = prefs.getFloat("available_money", 250f).toDouble()
+        val coachMarkCompleted = prefs.getBoolean(QuotaNotificationHelper.KEY_COACH_MARK_COMPLETED, false)
         return PreferenceUiSlice(
             language = language,
+            darkModeEnabled = darkMode,
             notificationsEnabled = notificationsEnabled,
             alertThresholdDays = thresholdDays,
-            availableMoney = availableMoney
+            availableMoney = availableMoney,
+            coachMarkActive = !coachMarkCompleted,
+            coachMarkStepIndex = 0
         )
     }
 
@@ -656,11 +1071,24 @@ class PvsViewModel(
         private val repository: InstallmentRepository,
         private val aiRepository: ProductAiRepository = ProductAiRepository(),
         private val sharedPrefs: SharedPreferences? = null,
-        private val reminderCoordinator: QuotaReminderCoordinator? = null
+        private val reminderCoordinator: QuotaReminderCoordinator? = null,
+        private val firestoreSyncRepository: FirestoreSyncRepository? = null,
+        private val assistantRepository: PvsAssistantRepository? = null,
+        private val signedInUserName: String? = null,
+        private val signedInUserEmail: String? = null
     ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
-            return PvsViewModel(repository, aiRepository, sharedPrefs, reminderCoordinator) as T
+            return PvsViewModel(
+                repository = repository,
+                aiRepository = aiRepository,
+                sharedPrefs = sharedPrefs,
+                reminderCoordinator = reminderCoordinator,
+                firestoreSyncRepository = firestoreSyncRepository,
+                assistantRepository = assistantRepository,
+                signedInUserName = signedInUserName,
+                signedInUserEmail = signedInUserEmail
+            ) as T
         }
     }
 }

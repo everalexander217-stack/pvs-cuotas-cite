@@ -225,7 +225,7 @@ fun PriceTargetTrackerCard(
                             text = strings.targetPriceTitle,
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
-                            color = PvsForestDark,
+                            color = MaterialTheme.colorScheme.onSurface,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
@@ -350,7 +350,7 @@ fun PriceTargetTrackerCard(
                                 style = MaterialTheme.typography.titleLarge,
                                 fontFamily = JetBrainsMonoFontFamily,
                                 fontWeight = FontWeight.Bold,
-                                color = if (isBelowTarget) SemaphoreGreen else PvsForestDark
+                                color = if (isBelowTarget) SemaphoreGreen else MaterialTheme.colorScheme.onSurface
                             )
                         }
                     }
@@ -370,7 +370,7 @@ fun PriceTargetTrackerCard(
                             }
                             .testTag("target_price_value_tile"),
                         shape = RoundedCornerShape(16.dp),
-                        color = PvsMintSurface,
+                        color = MaterialTheme.colorScheme.secondaryContainer,
                         border = BorderStroke(1.dp, PvsLeafVibrant.copy(alpha = 0.45f))
                     ) {
                         Row(
@@ -384,21 +384,21 @@ fun PriceTargetTrackerCard(
                                 Text(
                                     text = strings.targetPriceYourGoalLabel,
                                     style = MaterialTheme.typography.labelSmall,
-                                    color = PvsForestGreen
+                                    color = MaterialTheme.colorScheme.primary
                                 )
                                 Text(
                                     text = formatUsd(targetPrice),
                                     style = MaterialTheme.typography.titleLarge,
                                     fontFamily = JetBrainsMonoFontFamily,
                                     fontWeight = FontWeight.Bold,
-                                    color = PvsForestDark,
+                                    color = MaterialTheme.colorScheme.onSurface,
                                     modifier = Modifier.testTag("active_target_price_text")
                                 )
                             }
                             Icon(
                                 imageVector = Icons.Rounded.Edit,
                                 contentDescription = strings.targetPriceEditBtn,
-                                tint = PvsForestGreen,
+                                tint = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.size(16.dp)
                             )
                         }
@@ -480,9 +480,9 @@ fun PriceTargetTrackerCard(
                         },
                         valueRange = sliderMin..sliderMax,
                         colors = SliderDefaults.colors(
-                            thumbColor = PvsForestGreen,
+                            thumbColor = MaterialTheme.colorScheme.primary,
                             activeTrackColor = PvsLeafVibrant,
-                            inactiveTrackColor = PvsMintContainer
+                            inactiveTrackColor = MaterialTheme.colorScheme.primaryContainer
                         ),
                         modifier = Modifier.testTag("target_price_slider")
                     )
@@ -499,8 +499,8 @@ fun PriceTargetTrackerCard(
                     shape = RoundedCornerShape(16.dp),
                     border = BorderStroke(1.dp, PvsLeafVibrant.copy(alpha = 0.6f)),
                     colors = ButtonDefaults.outlinedButtonColors(
-                        containerColor = PvsMintSurface,
-                        contentColor = PvsForestDark
+                        containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onSurface
                     ),
                     contentPadding = PaddingValues(vertical = 12.dp, horizontal = 16.dp),
                     modifier = Modifier
@@ -511,7 +511,7 @@ fun PriceTargetTrackerCard(
                     Icon(
                         imageVector = Icons.Rounded.AddAlert,
                         contentDescription = null,
-                        tint = PvsForestGreen,
+                        tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(18.dp)
                     )
                     Spacer(modifier = Modifier.width(8.dp))
@@ -560,13 +560,13 @@ fun PriceTargetTrackerCard(
                                 text = "-$discountPct%",
                                 style = MaterialTheme.typography.labelMedium,
                                 fontWeight = FontWeight.Bold,
-                                color = if (isPresetSelected) Color.White else PvsForestGreen
+                                color = if (isPresetSelected) Color.White else MaterialTheme.colorScheme.primary
                             )
                             Text(
                                 text = formatUsd(presetPrice),
                                 style = MaterialTheme.typography.labelSmall,
                                 fontFamily = JetBrainsMonoFontFamily,
-                                color = if (isPresetSelected) PvsMintSurface else MaterialTheme.colorScheme.onSurfaceVariant
+                                color = if (isPresetSelected) Color.White.copy(alpha = 0.9f) else MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     }
@@ -623,7 +623,7 @@ fun PriceTargetTrackerCard(
                                         style = MaterialTheme.typography.labelSmall,
                                         fontFamily = JetBrainsMonoFontFamily,
                                         fontWeight = FontWeight.Bold,
-                                        color = if (savedIsBelow) SemaphoreGreen else PvsForestDark
+                                        color = if (savedIsBelow) SemaphoreGreen else MaterialTheme.colorScheme.onSurface
                                     )
                                 }
                             }
@@ -676,6 +676,9 @@ private fun PriceTargetVisualGauge(
         label = "gauge_target_pos"
     )
 
+    val trackColor = MaterialTheme.colorScheme.primaryContainer
+    val pinColor = MaterialTheme.colorScheme.onSurface
+
     Canvas(
         modifier = Modifier
             .fillMaxWidth()
@@ -687,7 +690,7 @@ private fun PriceTargetVisualGauge(
 
         // Base track
         drawRoundRect(
-            color = PvsMintContainer,
+            color = trackColor,
             topLeft = Offset(0f, barTop),
             size = Size(size.width, barHeight),
             cornerRadius = CornerRadius(barHeight / 2f, barHeight / 2f)
@@ -704,7 +707,7 @@ private fun PriceTargetVisualGauge(
 
         // Vertical Target Price pin line
         drawLine(
-            color = PvsForestDark,
+            color = pinColor,
             start = Offset(targetX, 2.dp.toPx()),
             end = Offset(targetX, size.height - 2.dp.toPx()),
             strokeWidth = 2.5.dp.toPx(),

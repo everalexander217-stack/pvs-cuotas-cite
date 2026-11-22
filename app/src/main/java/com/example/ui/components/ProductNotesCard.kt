@@ -143,7 +143,7 @@ fun ProductNotesCard(
                             text = strings.productNotesTitle,
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
-                            color = PvsForestDark,
+                            color = MaterialTheme.colorScheme.onSurface,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
@@ -161,7 +161,7 @@ fun ProductNotesCard(
 
                 Surface(
                     shape = RoundedCornerShape(50),
-                    color = if (notes.isNotEmpty()) PvsMintContainer else MaterialTheme.colorScheme.surfaceVariant,
+                    color = if (notes.isNotEmpty()) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant,
                     border = BorderStroke(
                         1.dp,
                         if (notes.isNotEmpty()) PvsLeafVibrant.copy(alpha = 0.55f) else MaterialTheme.colorScheme.outlineVariant
@@ -175,7 +175,7 @@ fun ProductNotesCard(
                         style = MaterialTheme.typography.labelSmall,
                         fontFamily = JetBrainsMonoFontFamily,
                         fontWeight = FontWeight.Bold,
-                        color = if (notes.isNotEmpty()) PvsForestDark else MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = if (notes.isNotEmpty()) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
                     )
                 }
@@ -203,7 +203,7 @@ fun ProductNotesCard(
                             }
                             .testTag("product_note_quick_chip_$idx"),
                         shape = RoundedCornerShape(50),
-                        color = PvsMintSurface,
+                        color = MaterialTheme.colorScheme.secondaryContainer,
                         border = BorderStroke(1.dp, PvsLeafVibrant.copy(alpha = 0.4f))
                     ) {
                         Row(
@@ -214,14 +214,14 @@ fun ProductNotesCard(
                             Icon(
                                 imageVector = Icons.Rounded.AddComment,
                                 contentDescription = null,
-                                tint = PvsForestGreen,
+                                tint = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.size(13.dp)
                             )
                             Text(
                                 text = tagText,
                                 style = MaterialTheme.typography.labelSmall,
                                 fontWeight = FontWeight.SemiBold,
-                                color = PvsForestDark
+                                color = MaterialTheme.colorScheme.onSurface
                             )
                         }
                     }
@@ -305,7 +305,7 @@ fun ProductNotesCard(
                         .fillMaxWidth()
                         .testTag("product_notes_empty_state"),
                     shape = RoundedCornerShape(16.dp),
-                    color = PvsMintSurface.copy(alpha = 0.65f),
+                    color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.65f),
                     border = BorderStroke(1.dp, PvsLeafVibrant.copy(alpha = 0.25f))
                 ) {
                     Row(
@@ -316,7 +316,7 @@ fun ProductNotesCard(
                         Icon(
                             imageVector = Icons.Rounded.EditNote,
                             contentDescription = null,
-                            tint = PvsForestGreen,
+                            tint = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.size(26.dp)
                         )
                         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
@@ -324,7 +324,7 @@ fun ProductNotesCard(
                                 text = strings.productNotesEmptyTitle,
                                 style = MaterialTheme.typography.labelLarge,
                                 fontWeight = FontWeight.Bold,
-                                color = PvsForestDark
+                                color = MaterialTheme.colorScheme.onSurface
                             )
                             Text(
                                 text = strings.productNotesEmptyBody,
@@ -344,10 +344,10 @@ fun ProductNotesCard(
                                 .fillMaxWidth()
                                 .testTag("product_note_item_${note.id}"),
                             shape = RoundedCornerShape(16.dp),
-                            color = PvsMintSurface,
+                            color = MaterialTheme.colorScheme.secondaryContainer,
                             border = BorderStroke(
                                 1.dp,
-                                if (isEditing) PvsForestGreen else PvsLeafVibrant.copy(alpha = 0.35f)
+                                if (isEditing) MaterialTheme.colorScheme.primary else PvsLeafVibrant.copy(alpha = 0.35f)
                             )
                         ) {
                             Column(
@@ -391,7 +391,7 @@ fun ProductNotesCard(
                                             Icon(
                                                 imageVector = Icons.Rounded.Check,
                                                 contentDescription = strings.productNotesUpdateBtn,
-                                                tint = PvsForestGreen
+                                                tint = MaterialTheme.colorScheme.primary
                                             )
                                         }
                                         IconButton(
@@ -421,14 +421,14 @@ fun ProductNotesCard(
                                                 text = note.noteText,
                                                 style = MaterialTheme.typography.bodyMedium,
                                                 fontWeight = FontWeight.Medium,
-                                                color = PvsForestDark,
+                                                color = MaterialTheme.colorScheme.onSurface,
                                                 modifier = Modifier.testTag("product_note_text_${note.id}")
                                             )
                                             Text(
                                                 text = dateFormatter.format(Date(note.updatedAt)),
                                                 style = MaterialTheme.typography.labelSmall,
                                                 fontFamily = JetBrainsMonoFontFamily,
-                                                color = PvsForestGreen.copy(alpha = 0.8f)
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
                                             )
                                         }
 
@@ -446,7 +446,7 @@ fun ProductNotesCard(
                                                 Icon(
                                                     imageVector = Icons.Rounded.Edit,
                                                     contentDescription = strings.productNotesEditCd,
-                                                    tint = PvsForestGreen,
+                                                    tint = MaterialTheme.colorScheme.primary,
                                                     modifier = Modifier.size(18.dp)
                                                 )
                                             }

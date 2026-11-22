@@ -261,7 +261,7 @@ fun PriceHistoryDashboardCard(
                                 text = strings.historyTitle,
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold,
-                                color = PvsForestDark
+                                color = MaterialTheme.colorScheme.onSurface
                             )
                             Text(
                                 text = if (selectedMonths == 0) {
@@ -396,14 +396,14 @@ fun PriceHistoryDashboardCard(
                 DashboardKpiTile(
                     label = strings.historyMinLabel,
                     value = formatUsd(minStore),
-                    valueColor = PvsForestGreen,
-                    bgColor = PvsMintSurface,
+                    valueColor = MaterialTheme.colorScheme.primary,
+                    bgColor = MaterialTheme.colorScheme.secondaryContainer,
                     modifier = Modifier.weight(1f)
                 )
                 DashboardKpiTile(
                     label = strings.historyMaxLabel,
                     value = formatUsd(maxStore),
-                    valueColor = PvsForestDark,
+                    valueColor = MaterialTheme.colorScheme.onSurface,
                     bgColor = MaterialTheme.colorScheme.surfaceVariant,
                     modifier = Modifier.weight(1f)
                 )
@@ -513,16 +513,18 @@ fun PriceHistoryDashboardCard(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             val activeLabelStyle = labelStyle.copy(
-                color = PvsForestDark,
+                color = MaterialTheme.colorScheme.onSurface,
                 fontWeight = FontWeight.Bold
             )
+            val chartGridColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)
+            val chartMarketColor = MaterialTheme.colorScheme.onSurface
 
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(216.dp)
                     .clip(RoundedCornerShape(18.dp))
-                    .background(PvsMintSurface.copy(alpha = 0.45f))
+                    .background(MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.45f))
                     .padding(top = 10.dp, bottom = 8.dp, start = 8.dp, end = 12.dp)
             ) {
                 if (selectedMonths == 0) {
@@ -592,7 +594,7 @@ fun PriceHistoryDashboardCard(
                     val chartH = (size.height - topPad - bottomPad).coerceAtLeast(10f)
 
                     // Horizontal dashed grid + Y axis labels (3 levels)
-                    val gridColor = PvsForestGreen.copy(alpha = 0.15f)
+                    val gridColor = chartGridColor
                     val gridDash = PathEffect.dashPathEffect(floatArrayOf(8f, 8f), 0f)
                     for (step in 0..2) {
                         val ratio = step / 2f
@@ -672,7 +674,7 @@ fun PriceHistoryDashboardCard(
                         // Market average dashed line
                         drawPath(
                             path = marketLinePath,
-                            color = PvsForestDark.copy(alpha = 0.55f),
+                            color = chartMarketColor.copy(alpha = 0.55f),
                             style = Stroke(
                                 width = 2.dp.toPx(),
                                 cap = StrokeCap.Round,
@@ -723,7 +725,7 @@ fun PriceHistoryDashboardCard(
                     val selMarket = marketCoords[clampedIdx]
 
                     drawLine(
-                        color = PvsForestDark.copy(alpha = 0.32f),
+                        color = chartMarketColor.copy(alpha = 0.32f),
                         start = Offset(selStore.x, topPad),
                         end = Offset(selStore.x, topPad + chartH),
                         strokeWidth = 1.5.dp.toPx(),
@@ -757,7 +759,7 @@ fun PriceHistoryDashboardCard(
                     }
 
                     drawCircle(
-                        color = PvsForestDark,
+                        color = chartMarketColor,
                         radius = 3.5.dp.toPx(),
                         center = selMarket
                     )
@@ -803,7 +805,7 @@ fun PriceHistoryDashboardCard(
                                 modifier = Modifier
                                     .width(14.dp)
                                     .height(2.dp)
-                                    .background(PvsForestDark.copy(alpha = 0.6f))
+                                    .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
                             )
                             Text(
                                 text = strings.historyLegendMarket,
@@ -820,14 +822,14 @@ fun PriceHistoryDashboardCard(
                                 showLogPriceDialog = true
                             },
                             shape = RoundedCornerShape(50),
-                            border = BorderStroke(1.dp, PvsForestGreen.copy(alpha = 0.5f)),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)),
                             contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
                             modifier = Modifier.testTag("log_scanned_price_button")
                         ) {
                             Icon(
                                 imageVector = Icons.Rounded.Add,
                                 contentDescription = null,
-                                tint = PvsForestGreen,
+                                tint = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.size(15.dp)
                             )
                             Spacer(modifier = Modifier.width(4.dp))
@@ -835,7 +837,7 @@ fun PriceHistoryDashboardCard(
                                 text = strings.historyScannedLogBtn,
                                 style = MaterialTheme.typography.labelSmall,
                                 fontWeight = FontWeight.Bold,
-                                color = PvsForestGreen
+                                color = MaterialTheme.colorScheme.primary
                             )
                         }
                     }
@@ -888,7 +890,11 @@ fun PriceHistoryDashboardCard(
                                         style = MaterialTheme.typography.labelMedium,
                                         fontFamily = JetBrainsMonoFontFamily,
                                         fontWeight = FontWeight.Bold,
-                                        color = if (isSelected) Color.White else PvsForestDark
+                                        color = when {
+                                            isSelected -> Color.White
+                                            isBelowAvg -> SemaphoreGreen
+                                            else -> MaterialTheme.colorScheme.onSurface
+                                        }
                                     )
                                 }
                             }

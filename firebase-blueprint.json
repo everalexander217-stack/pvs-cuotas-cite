@@ -1,0 +1,119 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Authenticated user profile and UI appearance preferences synced in Cloud Firestore.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Firebase Auth UID of the signed-in Google user." },
+        "displayName": { "type": "string", "description": "User display name." },
+        "email": { "type": "string", "description": "Optional user email address." },
+        "preferredTheme": { "type": "string", "enum": ["light", "dark"], "description": "Preferred UI theme mode." },
+        "languageCode": { "type": "string", "enum": ["ES", "EN"], "description": "Preferred interface language." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp when created (client submits FieldValue.serverTimestamp())." },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp when last updated (client submits FieldValue.serverTimestamp())." }
+      },
+      "required": ["userId", "displayName", "preferredTheme", "languageCode", "createdAt", "updatedAt"]
+    },
+    "CloudInstallment": {
+      "title": "CloudInstallment",
+      "description": "Biweekly installment plan synced per authenticated user.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Owner Firebase Auth UID." },
+        "title": { "type": "string", "description": "Installment product title." },
+        "code": { "type": "string", "description": "Product reference code." },
+        "category": { "type": "string", "description": "Product category." },
+        "initialPaid": { "type": "number", "description": "Down payment amount in USD." },
+        "totalAmount": { "type": "number", "description": "Total purchase price in USD." },
+        "biweeklyQuota": { "type": "number", "description": "Per-biweekly installment amount in USD." },
+        "totalQuotas": { "type": "integer", "description": "Total number of biweekly quotas." },
+        "paidQuotas": { "type": "integer", "description": "Number of quotas paid so far." },
+        "nextPaymentDate": { "type": "string", "description": "Human-readable next due date or Completado." },
+        "sortOrder": { "type": "integer", "description": "Display sort order index." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server creation timestamp." },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server update timestamp." }
+      },
+      "required": [
+        "userId",
+        "title",
+        "code",
+        "category",
+        "initialPaid",
+        "totalAmount",
+        "biweeklyQuota",
+        "totalQuotas",
+        "paidQuotas",
+        "nextPaymentDate",
+        "sortOrder",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "CloudPriceTarget": {
+      "title": "CloudPriceTarget",
+      "description": "User target price watchlist entry for a product code.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Owner Firebase Auth UID." },
+        "code": { "type": "string", "description": "Normalized product code." },
+        "productName": { "type": "string", "description": "Product display name." },
+        "targetPrice": { "type": "number", "description": "User target price threshold in USD." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server creation timestamp." },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server update timestamp." }
+      },
+      "required": ["userId", "code", "productName", "targetPrice", "createdAt", "updatedAt"]
+    },
+    "CloudProductNote": {
+      "title": "CloudProductNote",
+      "description": "User personal note attached to a verified product.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Owner Firebase Auth UID." },
+        "productCode": { "type": "string", "description": "Normalized product code." },
+        "productName": { "type": "string", "description": "Product display name." },
+        "noteText": { "type": "string", "description": "Note body text." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server creation timestamp." },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server update timestamp." }
+      },
+      "required": ["userId", "productCode", "productName", "noteText", "createdAt", "updatedAt"]
+    },
+    "CloudChatMessage": {
+      "title": "CloudChatMessage",
+      "description": "Multi-turn Gemini assistant message (including optional voice transcript & search grounding attribution).",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Owner Firebase Auth UID." },
+        "role": { "type": "string", "enum": ["user", "model"], "description": "Conversation turn author role." },
+        "text": { "type": "string", "description": "Message body text." },
+        "audioTranscript": { "type": "string", "description": "Optional voice transcription summary." },
+        "groundingNote": { "type": "string", "description": "Optional grounded web sources summary." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server creation timestamp." },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server update timestamp." }
+      },
+      "required": ["userId", "role", "text", "createdAt", "updatedAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "Authenticated user profile and theme preferences."
+    },
+    "/users/{userId}/installments/{installmentId}": {
+      "schema": { "$ref": "#/entities/CloudInstallment" },
+      "description": "User-owned biweekly installment plans."
+    },
+    "/users/{userId}/priceTargets/{targetId}": {
+      "schema": { "$ref": "#/entities/CloudPriceTarget" },
+      "description": "User-owned product price targets."
+    },
+    "/users/{userId}/productNotes/{noteId}": {
+      "schema": { "$ref": "#/entities/CloudProductNote" },
+      "description": "User-owned product notes."
+    },
+    "/users/{userId}/chatMessages/{messageId}": {
+      "schema": { "$ref": "#/entities/CloudChatMessage" },
+      "description": "User-owned Gemini assistant conversation history."
+    }
+  }
+}

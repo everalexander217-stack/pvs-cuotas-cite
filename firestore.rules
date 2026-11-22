@@ -1,0 +1,198 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global default-deny safety net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Shared Helpers ---
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isNum(v) {
+      return v is int || v is float;
+    }
+
+    function isValidTimestamp(v) {
+      return v is timestamp && v <= request.time;
+    }
+
+    // --- Entity Validation Helpers ---
+    function isValidUserProfile(data) {
+      return data.userId is string && data.userId == request.auth.uid &&
+             data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 80 &&
+             (!('email' in data) || (data.email is string && data.email.size() <= 160)) &&
+             data.preferredTheme in ['light', 'dark'] &&
+             data.languageCode in ['ES', 'EN'] &&
+             isValidTimestamp(data.createdAt) &&
+             isValidTimestamp(data.updatedAt);
+    }
+
+    function isValidCloudInstallment(data) {
+      return data.userId is string && data.userId == request.auth.uid &&
+             data.title is string && data.title.size() >= 1 && data.title.size() <= 120 &&
+             data.code is string && data.code.size() >= 1 && data.code.size() <= 32 &&
+             data.category is string && data.category.size() >= 1 && data.category.size() <= 40 &&
+             isNum(data.initialPaid) && data.initialPaid >= 0 &&
+             isNum(data.totalAmount) && data.totalAmount >= 0.01 &&
+             isNum(data.biweeklyQuota) && data.biweeklyQuota >= 0 &&
+             data.totalQuotas is int && data.totalQuotas >= 1 && data.totalQuotas <= 60 &&
+             data.paidQuotas is int && data.paidQuotas >= 0 && data.paidQuotas <= data.totalQuotas &&
+             data.nextPaymentDate is string && data.nextPaymentDate.size() >= 1 && data.nextPaymentDate.size() <= 40 &&
+             data.sortOrder is int && data.sortOrder >= 0 &&
+             isValidTimestamp(data.createdAt) &&
+             isValidTimestamp(data.updatedAt);
+    }
+
+    function isValidCloudPriceTarget(data) {
+      return data.userId is string && data.userId == request.auth.uid &&
+             data.code is string && data.code.size() >= 1 && data.code.size() <= 32 &&
+             data.productName is string && data.productName.size() >= 1 && data.productName.size() <= 120 &&
+             isNum(data.targetPrice) && data.targetPrice >= 1 &&
+             isValidTimestamp(data.createdAt) &&
+             isValidTimestamp(data.updatedAt);
+    }
+
+    function isValidCloudProductNote(data) {
+      return data.userId is string && data.userId == request.auth.uid &&
+             data.productCode is string && data.productCode.size() >= 1 && data.productCode.size() <= 32 &&
+             data.productName is string && data.productName.size() >= 1 && data.productName.size() <= 120 &&
+             data.noteText is string && data.noteText.size() >= 1 && data.noteText.size() <= 500 &&
+             isValidTimestamp(data.createdAt) &&
+             isValidTimestamp(data.updatedAt);
+    }
+
+    function isValidCloudChatMessage(data) {
+      return data.userId is string && data.userId == request.auth.uid &&
+             data.role in ['user', 'model'] &&
+             data.text is string && data.text.size() >= 1 && data.text.size() <= 8000 &&
+             (!('audioTranscript' in data) || (data.audioTranscript is string && data.audioTranscript.size() <= 2000)) &&
+             (!('groundingNote' in data) || (data.groundingNote is string && data.groundingNote.size() <= 1000)) &&
+             isValidTimestamp(data.createdAt) &&
+             isValidTimestamp(data.updatedAt);
+    }
+
+    // --- Collection Rules ---
+    match /users/{userId} {
+      allow get: if isOwner(userId) && isValidId(userId);
+      allow list: if isOwner(userId);
+
+      allow create: if isOwner(userId) &&
+                       isValidId(userId) &&
+                       incoming().keys().hasAll(['userId', 'displayName', 'preferredTheme', 'languageCode', 'createdAt', 'updatedAt']) &&
+                       incoming().keys().hasOnly(['userId', 'displayName', 'email', 'preferredTheme', 'languageCode', 'createdAt', 'updatedAt']) &&
+                       isValidUserProfile(incoming());
+
+      allow update: if isOwner(userId) &&
+                       isValidId(userId) &&
+                       isValidUserProfile(incoming()) &&
+                       incoming().userId == existing().userId &&
+                       incoming().createdAt == existing().createdAt &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'email', 'preferredTheme', 'languageCode', 'updatedAt']);
+
+      allow delete: if isOwner(userId) && isValidId(userId);
+
+      match /installments/{installmentId} {
+        allow get: if isOwner(userId) && isValidId(installmentId);
+        allow list: if isOwner(userId);
+
+        allow create: if isOwner(userId) &&
+                         isValidId(installmentId) &&
+                         incoming().keys().hasAll(['userId', 'title', 'code', 'category', 'initialPaid', 'totalAmount', 'biweeklyQuota', 'totalQuotas', 'paidQuotas', 'nextPaymentDate', 'sortOrder', 'createdAt', 'updatedAt']) &&
+                         incoming().keys().hasOnly(['userId', 'title', 'code', 'category', 'initialPaid', 'totalAmount', 'biweeklyQuota', 'totalQuotas', 'paidQuotas', 'nextPaymentDate', 'sortOrder', 'createdAt', 'updatedAt']) &&
+                         isValidCloudInstallment(incoming());
+
+        allow update: if isOwner(userId) &&
+                         isValidId(installmentId) &&
+                         isValidCloudInstallment(incoming()) &&
+                         incoming().userId == existing().userId &&
+                         incoming().createdAt == existing().createdAt &&
+                         incoming().diff(existing()).affectedKeys().hasOnly(['title', 'code', 'category', 'initialPaid', 'totalAmount', 'biweeklyQuota', 'totalQuotas', 'paidQuotas', 'nextPaymentDate', 'sortOrder', 'updatedAt']);
+
+        allow delete: if isOwner(userId) && isValidId(installmentId);
+      }
+
+      match /priceTargets/{targetId} {
+        allow get: if isOwner(userId) && isValidId(targetId);
+        allow list: if isOwner(userId);
+
+        allow create: if isOwner(userId) &&
+                         isValidId(targetId) &&
+                         incoming().keys().hasAll(['userId', 'code', 'productName', 'targetPrice', 'createdAt', 'updatedAt']) &&
+                         incoming().keys().hasOnly(['userId', 'code', 'productName', 'targetPrice', 'createdAt', 'updatedAt']) &&
+                         isValidCloudPriceTarget(incoming());
+
+        allow update: if isOwner(userId) &&
+                         isValidId(targetId) &&
+                         isValidCloudPriceTarget(incoming()) &&
+                         incoming().userId == existing().userId &&
+                         incoming().code == existing().code &&
+                         incoming().createdAt == existing().createdAt &&
+                         incoming().diff(existing()).affectedKeys().hasOnly(['productName', 'targetPrice', 'updatedAt']);
+
+        allow delete: if isOwner(userId) && isValidId(targetId);
+      }
+
+      match /productNotes/{noteId} {
+        allow get: if isOwner(userId) && isValidId(noteId);
+        allow list: if isOwner(userId);
+
+        allow create: if isOwner(userId) &&
+                         isValidId(noteId) &&
+                         incoming().keys().hasAll(['userId', 'productCode', 'productName', 'noteText', 'createdAt', 'updatedAt']) &&
+                         incoming().keys().hasOnly(['userId', 'productCode', 'productName', 'noteText', 'createdAt', 'updatedAt']) &&
+                         isValidCloudProductNote(incoming());
+
+        allow update: if isOwner(userId) &&
+                         isValidId(noteId) &&
+                         isValidCloudProductNote(incoming()) &&
+                         incoming().userId == existing().userId &&
+                         incoming().productCode == existing().productCode &&
+                         incoming().createdAt == existing().createdAt &&
+                         incoming().diff(existing()).affectedKeys().hasOnly(['productName', 'noteText', 'updatedAt']);
+
+        allow delete: if isOwner(userId) && isValidId(noteId);
+      }
+
+      match /chatMessages/{messageId} {
+        allow get: if isOwner(userId) && isValidId(messageId);
+        allow list: if isOwner(userId);
+
+        allow create: if isOwner(userId) &&
+                         isValidId(messageId) &&
+                         incoming().keys().hasAll(['userId', 'role', 'text', 'createdAt', 'updatedAt']) &&
+                         incoming().keys().hasOnly(['userId', 'role', 'text', 'audioTranscript', 'groundingNote', 'createdAt', 'updatedAt']) &&
+                         isValidCloudChatMessage(incoming());
+
+        allow update: if isOwner(userId) &&
+                         isValidId(messageId) &&
+                         isValidCloudChatMessage(incoming()) &&
+                         incoming().userId == existing().userId &&
+                         incoming().role == existing().role &&
+                         incoming().createdAt == existing().createdAt &&
+                         incoming().diff(existing()).affectedKeys().hasOnly(['text', 'audioTranscript', 'groundingNote', 'updatedAt']);
+
+        allow delete: if isOwner(userId) && isValidId(messageId);
+      }
+    }
+  }
+}

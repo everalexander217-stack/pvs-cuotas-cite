@@ -1,5 +1,6 @@
 package com.example.ui.screens
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.animateContentSize
@@ -17,6 +18,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -27,15 +29,21 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.Label
 import androidx.compose.material.icons.outlined.CalendarToday
 import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.rounded.Add
@@ -44,20 +52,17 @@ import androidx.compose.material.icons.rounded.ArrowUpward
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.DragIndicator
 import androidx.compose.material.icons.rounded.ExpandMore
-import androidx.compose.material.icons.rounded.Headphones
-import androidx.compose.material.icons.rounded.LaptopMac
 import androidx.compose.material.icons.rounded.Payments
-import androidx.compose.material.icons.rounded.PhoneAndroid
 import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material.icons.rounded.ShoppingBag
-import androidx.compose.material.icons.rounded.SportsScore
-import androidx.compose.material.icons.rounded.Tv
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -91,13 +96,16 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
+import com.example.data.CategoryCatalog
 import com.example.data.DueDateUtils
 import com.example.data.InstallmentEntity
 import com.example.ui.PvsUiState
 import com.example.ui.components.AnimatedQuotaProgressBar
+import com.example.ui.components.CoachMarkStepId
 import com.example.ui.components.CodePillBadge
 import com.example.ui.components.PvsCurvedWaveOverlay
 import com.example.ui.components.PvsHeaderBar
+import com.example.ui.components.coachMarkTarget
 import com.example.ui.components.formatUsd
 import com.example.ui.components.pvsBouncyScale
 import com.example.ui.components.shareInstallmentViaChooser
@@ -137,6 +145,7 @@ fun MisCuotasScreen(
     onOpenNotifications: () -> Unit,
     onOpenTutorial: (() -> Unit)? = null,
     onGoToVerifier: (() -> Unit)? = null,
+    onUpdateCategory: (Int, String) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier
 ) {
     val strings = LocalAppStrings.current
@@ -146,8 +155,10 @@ fun MisCuotasScreen(
 
     var draggingItemId by remember { mutableStateOf<Int?>(null) }
     var dragOffsetY by remember { mutableFloatStateOf(0f) }
+    var categoryPickerItem by remember { mutableStateOf<InstallmentEntity?>(null) }
 
-    Column(modifier = modifier.fillMaxSize()) {
+    Box(modifier = modifier.fillMaxSize()) {
+    Column(modifier = Modifier.fillMaxSize()) {
         PvsHeaderBar(
             title = strings.navMisCuotas,
             subtitle = strings.brandTagline,
@@ -168,7 +179,8 @@ fun MisCuotasScreen(
                     totalQuincena = state.totalQuincena,
                     activeCount = state.activeInstallments.size,
                     nextDueDate = state.nextDueDateSummary.ifBlank { strings.noPendingDue },
-                    onAddClick = { onShowAddDialog(true) }
+                    onAddClick = { onShowAddDialog(true) },
+                    useHeroCardForStep4Fallback = (onGoToVerifier == null)
                 )
             }
 
@@ -178,6 +190,7 @@ fun MisCuotasScreen(
                     Surface(
                         modifier = Modifier
                             .fillMaxWidth()
+                            .coachMarkTarget(CoachMarkStepId.QUICK_SCAN_TO_QUOTA)
                             .pvsBouncyScale(promptInteraction, pressedScale = 0.97f)
                             .clip(RoundedCornerShape(18.dp))
                             .clickable(
@@ -189,7 +202,7 @@ fun MisCuotasScreen(
                             }
                             .testTag("quick_buy_prompt_card"),
                         shape = RoundedCornerShape(18.dp),
-                        color = PvsMintSurface,
+                        color = MaterialTheme.colorScheme.secondaryContainer,
                         border = BorderStroke(1.dp, PvsLeafVibrant.copy(alpha = 0.45f))
                     ) {
                         Row(
@@ -202,14 +215,14 @@ fun MisCuotasScreen(
                             Text(
                                 text = strings.quickBuyPromptCta,
                                 style = MaterialTheme.typography.labelLarge,
-                                color = PvsForestDark,
+                                color = MaterialTheme.colorScheme.onSurface,
                                 modifier = Modifier.weight(1f)
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Icon(
                                 imageVector = Icons.Rounded.Add,
                                 contentDescription = null,
-                                tint = PvsForestGreen,
+                                tint = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.size(18.dp)
                             )
                         }
@@ -293,6 +306,7 @@ fun MisCuotasScreen(
                         canMoveUp = index > 0,
                         canMoveDown = index < state.installments.lastIndex,
                         onToggleExpand = { onToggleExpand(item.id) },
+                        onEditCategory = { categoryPickerItem = item },
                         onRegisterPayment = { onRegisterPayment(item) },
                         onMoveUp = { onMoveStep(item.id, -1) },
                         onMoveDown = { onMoveStep(item.id, 1) },
@@ -316,9 +330,23 @@ fun MisCuotasScreen(
 
     if (state.showAddDialog) {
         AddInstallmentDialog(
+            availableCategories = state.availableCategories,
             onDismiss = { onShowAddDialog(false) },
             onConfirm = onAddCustomInstallment
         )
+    }
+
+        categoryPickerItem?.let { targetItem ->
+            CategoryTagPickerDialog(
+                item = targetItem,
+                availableCategories = state.availableCategories,
+                onDismiss = { categoryPickerItem = null },
+                onConfirm = { newCategory ->
+                    onUpdateCategory(targetItem.id, newCategory)
+                    categoryPickerItem = null
+                }
+            )
+        }
     }
 }
 
@@ -327,7 +355,8 @@ private fun QuincenaSummaryHeroCard(
     totalQuincena: Double,
     activeCount: Int,
     nextDueDate: String,
-    onAddClick: () -> Unit
+    onAddClick: () -> Unit,
+    useHeroCardForStep4Fallback: Boolean = false
 ) {
     val strings = LocalAppStrings.current
     val animatedTotal by animateFloatAsState(
@@ -342,6 +371,13 @@ private fun QuincenaSummaryHeroCard(
     Card(
         modifier = Modifier
             .fillMaxWidth()
+            .let { base ->
+                if (useHeroCardForStep4Fallback) {
+                    base.coachMarkTarget(CoachMarkStepId.QUICK_SCAN_TO_QUOTA)
+                } else {
+                    base
+                }
+            }
             .testTag("quincena_total_card"),
         shape = RoundedCornerShape(28.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
@@ -425,6 +461,7 @@ private fun QuincenaSummaryHeroCard(
                         ),
                         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 7.dp),
                         modifier = Modifier
+                            .coachMarkTarget(CoachMarkStepId.ADD_QUOTA_BUTTON)
                             .pvsBouncyScale(addInteraction)
                             .testTag("add_cuota_button")
                     ) {
@@ -493,6 +530,7 @@ private fun InstallmentReorderableCard(
     canMoveUp: Boolean,
     canMoveDown: Boolean,
     onToggleExpand: () -> Unit,
+    onEditCategory: () -> Unit,
     onRegisterPayment: () -> Unit,
     onMoveUp: () -> Unit,
     onMoveDown: () -> Unit,
@@ -609,13 +647,13 @@ private fun InstallmentReorderableCard(
                     modifier = Modifier
                         .size(44.dp)
                         .clip(RoundedCornerShape(14.dp))
-                        .background(if (item.isCompleted) SemaphoreGreenBg else PvsMintSurface),
+                        .background(if (item.isCompleted) SemaphoreGreenBg else MaterialTheme.colorScheme.secondaryContainer),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         imageVector = categoryIcon(item.category),
                         contentDescription = null,
-                        tint = if (item.isCompleted) SemaphoreGreen else PvsForestGreen,
+                        tint = if (item.isCompleted) SemaphoreGreen else MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(22.dp)
                     )
                 }
@@ -623,11 +661,45 @@ private fun InstallmentReorderableCard(
                 Spacer(modifier = Modifier.width(12.dp))
 
                 Column(modifier = Modifier.weight(1f)) {
+                    val catColor = CategoryCatalog.colorForCategory(item.category)
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         CodePillBadge(code = item.code)
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = catColor.copy(alpha = 0.14f),
+                            border = BorderStroke(0.8.dp, catColor.copy(alpha = 0.4f)),
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .clickable {
+                                    cardHaptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    onEditCategory()
+                                }
+                                .testTag("category_badge_${item.code}")
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(3.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Rounded.Label,
+                                    contentDescription = strings.categoryEditAction,
+                                    tint = catColor,
+                                    modifier = Modifier.size(11.dp)
+                                )
+                                Text(
+                                    text = CategoryCatalog.normalizeCategory(item.category),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = catColor,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
                         if (item.isCompleted) {
                             Surface(
                                 shape = RoundedCornerShape(8.dp),
@@ -643,12 +715,12 @@ private fun InstallmentReorderableCard(
                         } else if (isDueSoon && daysUntil != null) {
                             Surface(
                                 shape = RoundedCornerShape(8.dp),
-                                color = PvsMintSurface
+                                color = MaterialTheme.colorScheme.primaryContainer
                             ) {
                                 Text(
                                     text = strings.urgencyLabel(daysUntil),
                                     style = MaterialTheme.typography.labelSmall,
-                                    color = PvsForestGreen,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer,
                                     modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                                 )
                             }
@@ -681,7 +753,7 @@ private fun InstallmentReorderableCard(
                         style = MaterialTheme.typography.titleMedium,
                         fontFamily = JetBrainsMonoFontFamily,
                         fontWeight = FontWeight.Bold,
-                        color = if (item.isCompleted) SemaphoreGreen else PvsForestDark
+                        color = if (item.isCompleted) SemaphoreGreen else MaterialTheme.colorScheme.onSurface
                     )
                     Text(
                         text = strings.quincenaUnit,
@@ -695,7 +767,7 @@ private fun InstallmentReorderableCard(
                 Icon(
                     imageVector = Icons.Rounded.ExpandMore,
                     contentDescription = if (isExpanded) "Contraer" else "Expandir",
-                    tint = PvsForestGreen,
+                    tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier
                         .size(22.dp)
                         .rotate(chevronRotation)
@@ -758,7 +830,7 @@ private fun InstallmentReorderableCard(
                             text = strings.quotasProgressCount(item.paidQuotas, item.totalQuotas, pct),
                             style = MaterialTheme.typography.labelMedium,
                             fontFamily = JetBrainsMonoFontFamily,
-                            color = PvsForestGreen
+                            color = MaterialTheme.colorScheme.primary
                         )
                     }
                     Spacer(modifier = Modifier.height(8.dp))
@@ -772,8 +844,31 @@ private fun InstallmentReorderableCard(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(top = 6.dp),
-                        horizontalArrangement = Arrangement.End
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
+                        TextButton(
+                            onClick = {
+                                cardHaptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                onEditCategory()
+                            },
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                            modifier = Modifier.testTag("edit_category_btn_${item.code}")
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Rounded.Label,
+                                contentDescription = strings.categoryEditAction,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "${strings.categoryEditAction}: ${CategoryCatalog.normalizeCategory(item.category)}",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+
                         TextButton(
                             onClick = {
                                 cardHaptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
@@ -789,14 +884,14 @@ private fun InstallmentReorderableCard(
                             Icon(
                                 imageVector = Icons.Rounded.Share,
                                 contentDescription = strings.shareInstallmentBtn,
-                                tint = PvsForestGreen,
+                                tint = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.size(16.dp)
                             )
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
                                 text = strings.shareInstallmentBtn,
                                 style = MaterialTheme.typography.labelMedium,
-                                color = PvsForestGreen
+                                color = MaterialTheme.colorScheme.primary
                             )
                         }
                     }
@@ -849,7 +944,7 @@ private fun InstallmentReorderableCard(
                                 Icon(
                                     imageVector = Icons.Rounded.ArrowUpward,
                                     contentDescription = strings.actionMoveUp,
-                                    tint = if (canMoveUp) PvsForestGreen else MaterialTheme.colorScheme.outline
+                                    tint = if (canMoveUp) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
                                 )
                             }
                             IconButton(
@@ -860,7 +955,7 @@ private fun InstallmentReorderableCard(
                                 Icon(
                                     imageVector = Icons.Rounded.ArrowDownward,
                                     contentDescription = strings.actionMoveDown,
-                                    tint = if (canMoveDown) PvsForestGreen else MaterialTheme.colorScheme.outline
+                                    tint = if (canMoveDown) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
                                 )
                             }
                             IconButton(
@@ -937,13 +1032,13 @@ private fun EmptyCuotasCard(
                 modifier = Modifier
                     .size(56.dp)
                     .clip(CircleShape)
-                    .background(PvsMintSurface),
+                    .background(MaterialTheme.colorScheme.secondaryContainer),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = Icons.Rounded.ShoppingBag,
                     contentDescription = null,
-                    tint = PvsForestGreen,
+                    tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(28.dp)
                 )
             }
@@ -976,6 +1071,7 @@ private fun EmptyCuotasCard(
 
 @Composable
 private fun AddInstallmentDialog(
+    availableCategories: List<String>,
     onDismiss: () -> Unit,
     onConfirm: (
         title: String,
@@ -990,6 +1086,7 @@ private fun AddInstallmentDialog(
     val strings = LocalAppStrings.current
     var title by remember { mutableStateOf("") }
     var code by remember { mutableStateOf("") }
+    var category by remember { mutableStateOf("Tecnología") }
     var totalStr by remember { mutableStateOf("") }
     var initialStr by remember { mutableStateOf("") }
     var quotasStr by remember { mutableStateOf("4") }
@@ -1009,7 +1106,10 @@ private fun AddInstallmentDialog(
             )
         },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
                 OutlinedTextField(
                     value = title,
                     onValueChange = { title = it },
@@ -1017,6 +1117,43 @@ private fun AddInstallmentDialog(
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
+                OutlinedTextField(
+                    value = category,
+                    onValueChange = { if (it.length <= 40) category = it },
+                    label = { Text(strings.dialogFieldCategory) },
+                    placeholder = { Text(strings.dialogCategoryHint) },
+                    leadingIcon = {
+                        Icon(
+                            imageVector = CategoryCatalog.iconForCategory(category),
+                            contentDescription = null,
+                            tint = CategoryCatalog.colorForCategory(category)
+                        )
+                    },
+                    singleLine = true,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("dialog_category_input")
+                )
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    availableCategories.forEach { preset ->
+                        val selected = category.trim().equals(preset, ignoreCase = true)
+                        FilterChip(
+                            selected = selected,
+                            onClick = { category = preset },
+                            label = { Text(preset, style = MaterialTheme.typography.labelSmall) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = CategoryCatalog.colorForCategory(preset).copy(alpha = 0.18f),
+                                selectedLabelColor = MaterialTheme.colorScheme.onSurface
+                            ),
+                            modifier = Modifier.testTag("dialog_category_chip_$preset")
+                        )
+                    }
+                }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedTextField(
                         value = code,
@@ -1067,7 +1204,7 @@ private fun AddInstallmentDialog(
                     onConfirm(
                         title,
                         code,
-                        "General",
+                        CategoryCatalog.normalizeCategory(category),
                         initial,
                         total,
                         quotas,
@@ -1075,7 +1212,8 @@ private fun AddInstallmentDialog(
                     )
                 },
                 enabled = isValid,
-                colors = ButtonDefaults.buttonColors(containerColor = PvsForestGreen)
+                colors = ButtonDefaults.buttonColors(containerColor = PvsForestGreen),
+                modifier = Modifier.testTag("dialog_save_installment_button")
             ) {
                 Text(strings.actionSave)
             }
@@ -1088,13 +1226,161 @@ private fun AddInstallmentDialog(
     )
 }
 
-private fun categoryIcon(category: String): ImageVector {
-    return when (category) {
-        "Tecnología" -> Icons.Rounded.Tv
-        "Telefonía" -> Icons.Rounded.PhoneAndroid
-        "Audio" -> Icons.Rounded.Headphones
-        "Calzado" -> Icons.Rounded.SportsScore
-        "Computación" -> Icons.Rounded.LaptopMac
-        else -> Icons.Rounded.ShoppingBag
+@Composable
+private fun CategoryTagPickerDialog(
+    item: InstallmentEntity,
+    availableCategories: List<String>,
+    onDismiss: () -> Unit,
+    onConfirm: (String) -> Unit
+) {
+    val strings = LocalAppStrings.current
+    var categoryText by remember(item.id) { mutableStateOf(CategoryCatalog.normalizeCategory(item.category)) }
+    val normalizedPreview = CategoryCatalog.normalizeCategory(categoryText)
+    val backdropInteraction = remember { MutableInteractionSource() }
+    val cardInteraction = remember { MutableInteractionSource() }
+
+    BackHandler(onBack = onDismiss)
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .zIndex(20f)
+            .background(Color.Black.copy(alpha = 0.54f))
+            .clickable(
+                interactionSource = backdropInteraction,
+                indication = null,
+                onClick = onDismiss
+            )
+            .imePadding()
+            .padding(20.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .widthIn(max = 460.dp)
+                .heightIn(max = 580.dp)
+                .clickable(
+                    interactionSource = cardInteraction,
+                    indication = null,
+                    onClick = {}
+                )
+                .testTag("category_picker_dialog"),
+            shape = RoundedCornerShape(28.dp),
+            color = MaterialTheme.colorScheme.surface,
+            tonalElevation = 6.dp,
+            shadowElevation = 10.dp,
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(22.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text(
+                    text = strings.categoryPickerTitle,
+                    style = MaterialTheme.typography.titleLarge,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f, fill = false)
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text(
+                        text = strings.categoryPickerSubtitle(item.title),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    OutlinedTextField(
+                        value = categoryText,
+                        onValueChange = { if (it.length <= 40) categoryText = it },
+                        label = { Text(strings.dialogFieldCategory) },
+                        placeholder = { Text(strings.dialogCategoryHint) },
+                        leadingIcon = {
+                            Icon(
+                                imageVector = CategoryCatalog.iconForCategory(normalizedPreview),
+                                contentDescription = null,
+                                tint = CategoryCatalog.colorForCategory(normalizedPreview)
+                            )
+                        },
+                        singleLine = true,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("category_picker_input")
+                    )
+
+                    Text(
+                        text = strings.dialogCategoryPresetsLabel,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        availableCategories.chunked(2).forEach { pair ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                pair.forEach { preset ->
+                                    val isSelected = categoryText.trim().equals(preset, ignoreCase = true)
+                                    val color = CategoryCatalog.colorForCategory(preset)
+                                    FilterChip(
+                                        selected = isSelected,
+                                        onClick = { categoryText = preset },
+                                        label = {
+                                            Text(
+                                                text = preset,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                        },
+                                        colors = FilterChipDefaults.filterChipColors(
+                                            selectedContainerColor = color.copy(alpha = 0.2f),
+                                            selectedLabelColor = MaterialTheme.colorScheme.onSurface
+                                        ),
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .testTag("category_preset_chip_$preset")
+                                    )
+                                }
+                                if (pair.size == 1) {
+                                    Spacer(modifier = Modifier.weight(1f))
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    TextButton(onClick = onDismiss) {
+                        Text(strings.actionCancel)
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Button(
+                        onClick = { onConfirm(normalizedPreview) },
+                        enabled = categoryText.isNotBlank(),
+                        colors = ButtonDefaults.buttonColors(containerColor = PvsForestGreen),
+                        modifier = Modifier.testTag("category_picker_save_button")
+                    ) {
+                        Text(strings.actionSave)
+                    }
+                }
+            }
+        }
     }
 }
+
+private fun categoryIcon(category: String): ImageVector = CategoryCatalog.iconForCategory(category)

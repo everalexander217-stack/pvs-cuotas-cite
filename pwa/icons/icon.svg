@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="pvsBg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0D3822"/>
+      <stop offset="55%" stop-color="#1B5E3A"/>
+      <stop offset="100%" stop-color="#38B261"/>
+    </linearGradient>
+    <linearGradient id="pvsLeaf" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#4CD478"/>
+      <stop offset="100%" stop-color="#D3EDD9"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="116" fill="url(#pvsBg)"/>
+  <circle cx="404" cy="108" r="56" fill="#4CD478" fill-opacity="0.18"/>
+  <path d="M144 136h104c58 0 98 34 98 88 0 56-40 90-98 90h-48v74c0 12-10 22-22 22h-34c-12 0-22-10-22-22V158c0-12 10-22 22-22zm56 56v68h44c26 0 44-13 44-34s-18-34-44-34h-44z" fill="#FFFFFF"/>
+  <path d="M312 372c44-8 78-42 84-86-44 8-78 42-84 86z" fill="url(#pvsLeaf)"/>
+  <g fill="#E8F5EC" opacity="0.92">
+    <rect x="296" y="138" width="12" height="56" rx="6"/>
+    <rect x="318" y="138" width="8" height="56" rx="4"/>
+    <rect x="336" y="138" width="16" height="56" rx="6"/>
+    <rect x="362" y="138" width="10" height="56" rx="5"/>
+  </g>
+</svg>

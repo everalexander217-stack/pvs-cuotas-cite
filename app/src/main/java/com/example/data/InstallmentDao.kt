@@ -36,6 +36,12 @@ interface InstallmentDao {
     @Query("UPDATE installments SET paidQuotas = :paidQuotas, nextPaymentDate = :nextPaymentDate WHERE id = :id")
     suspend fun updatePaymentProgress(id: Int, paidQuotas: Int, nextPaymentDate: String)
 
+    @Query("UPDATE installments SET category = :category WHERE id = :id")
+    suspend fun updateCategory(id: Int, category: String)
+
+    @Query("SELECT * FROM installments WHERE id = :id LIMIT 1")
+    suspend fun getById(id: Int): InstallmentEntity?
+
     @Query("DELETE FROM installments WHERE id = :id")
     suspend fun deleteById(id: Int)
 }

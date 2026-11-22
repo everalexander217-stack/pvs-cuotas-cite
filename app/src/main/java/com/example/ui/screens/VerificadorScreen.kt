@@ -38,6 +38,7 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ArrowForward
 import androidx.compose.material.icons.rounded.AccountBalanceWallet
 import androidx.compose.material.icons.rounded.AddShoppingCart
 import androidx.compose.material.icons.rounded.AutoAwesome
@@ -46,6 +47,7 @@ import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.History
+import androidx.compose.material.icons.rounded.Keyboard
 import androidx.compose.material.icons.rounded.QrCodeScanner
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Schedule
@@ -79,6 +81,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -86,9 +89,11 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.ai.AiAnalysisUiState
 import com.example.data.PriceVerdict
@@ -97,6 +102,8 @@ import com.example.data.ProductNoteEntity
 import com.example.data.ProductVerifierCatalog
 import com.example.ui.PvsUiState
 import com.example.ui.components.BarcodeScannerDialog
+import com.example.ui.components.BiweeklyQuotaCalculatorCard
+import com.example.ui.components.CoachMarkStepId
 import com.example.ui.components.CodePillBadge
 import com.example.ui.components.PriceHistoryDashboardCard
 import com.example.ui.components.PriceTargetTrackerCard
@@ -105,6 +112,7 @@ import com.example.ui.components.PvsCurvedWaveOverlay
 import com.example.ui.components.PvsHeaderBar
 import com.example.ui.components.ScannedProductShowcaseCard
 import com.example.ui.components.TrafficLightSemaphore
+import com.example.ui.components.coachMarkTarget
 import com.example.ui.components.formatUsd
 import com.example.ui.components.pvsBouncyScale
 import com.example.ui.theme.JetBrainsMonoFontFamily
@@ -159,6 +167,13 @@ fun VerificadorScreen(
     val scrollState = rememberScrollState()
     var showBudgetDialog by remember { mutableStateOf(false) }
     var showScanner by remember { mutableStateOf(false) }
+    var showAutocomplete by remember { mutableStateOf(false) }
+    val autocompleteSuggestions = remember(state.searchQuery, state.recentSearches) {
+        ProductVerifierCatalog.autocompleteSuggestions(
+            rawQuery = state.searchQuery,
+            recentSearches = state.recentSearches
+        )
+    }
 
     LaunchedEffect(state.verifiedProduct?.code, state.aiAnalysisState is AiAnalysisUiState.Idle) {
         if (state.verifiedProduct != null && state.aiAnalysisState is AiAnalysisUiState.Idle) {
@@ -243,6 +258,7 @@ fun VerificadorScreen(
                             val heroScanInt = remember { MutableInteractionSource() }
                             Surface(
                                 modifier = Modifier
+                                    .coachMarkTarget(CoachMarkStepId.SCAN_BUTTON)
                                     .pvsBouncyScale(heroScanInt)
                                     .clip(RoundedCornerShape(50))
                                     .clickable(
@@ -281,108 +297,340 @@ fun VerificadorScreen(
                 }
             }
 
-            // Search Input + CameraX Scan IconButton + "Analizar" Bouncy Action
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                OutlinedTextField(
-                    value = state.searchQuery,
-                    onValueChange = onQueryChange,
-                    placeholder = {
-                        Text(
-                            text = strings.verifierSearchHint,
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                    },
-                    leadingIcon = {
-                        Icon(
-                            imageVector = Icons.Rounded.Search,
-                            contentDescription = null,
-                            tint = PvsForestGreen
-                        )
-                    },
-                    trailingIcon = {
-                        if (state.searchQuery.isNotEmpty()) {
-                            IconButton(onClick = { onQueryChange("") }) {
-                                Icon(
-                                    imageVector = Icons.Rounded.Close,
-                                    contentDescription = "Limpiar búsqueda",
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                        }
-                    },
-                    singleLine = true,
-                    shape = RoundedCornerShape(20.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedContainerColor = MaterialTheme.colorScheme.surface,
-                        unfocusedContainerColor = MaterialTheme.colorScheme.surface,
-                        focusedBorderColor = PvsLeafVibrant,
-                        unfocusedBorderColor = MaterialTheme.colorScheme.outline
-                    ),
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                    keyboardActions = KeyboardActions(
-                        onSearch = {
-                            onSubmitSearch()
-                            focusManager.clearFocus()
-                        }
-                    ),
-                    modifier = Modifier
-                        .weight(1f)
-                        .testTag("verifier_search_input")
-                )
-
-                val scanIconInteraction = remember { MutableInteractionSource() }
-                Surface(
-                    modifier = Modifier
-                        .size(52.dp)
-                        .pvsBouncyScale(scanIconInteraction)
-                        .clip(RoundedCornerShape(18.dp))
-                        .clickable(
-                            interactionSource = scanIconInteraction,
-                            indication = androidx.compose.material3.ripple()
-                        ) {
-                            haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                            focusManager.clearFocus()
-                            showScanner = true
-                        }
-                        .testTag("open_barcode_scanner_button"),
-                    shape = RoundedCornerShape(18.dp),
-                    color = PvsMintContainer,
-                    border = BorderStroke(1.dp, PvsLeafVibrant.copy(alpha = 0.5f))
+            // Manual Search Header + Input with Live Autocomplete + CameraX Scan + "Analizar"
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            imageVector = Icons.Rounded.QrCodeScanner,
-                            contentDescription = strings.scannerOpenBtn,
-                            tint = PvsForestDark,
-                            modifier = Modifier.size(23.dp)
+                    Icon(
+                        imageVector = Icons.Rounded.Keyboard,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = strings.verifierManualLabel,
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onBackground
+                        )
+                        Text(
+                            text = strings.verifierManualSubtitle,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
 
-                val searchBtnInteraction = remember { MutableInteractionSource() }
-                Button(
-                    onClick = {
-                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                        focusManager.clearFocus()
-                        onSubmitSearch()
-                    },
-                    enabled = state.searchQuery.isNotBlank(),
-                    interactionSource = searchBtnInteraction,
-                    shape = RoundedCornerShape(18.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = PvsForestGreen),
-                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 15.dp),
-                    modifier = Modifier
-                        .pvsBouncyScale(searchBtnInteraction)
-                        .testTag("verifier_analyze_button")
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Text(
-                        text = strings.verifierSearchAction,
-                        style = MaterialTheme.typography.labelLarge
+                    OutlinedTextField(
+                        value = state.searchQuery,
+                        onValueChange = { updated ->
+                            showAutocomplete = true
+                            onQueryChange(updated)
+                        },
+                        placeholder = {
+                            Text(
+                                text = strings.verifierSearchHint,
+                                style = MaterialTheme.typography.bodyMedium,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        },
+                        leadingIcon = {
+                            Icon(
+                                imageVector = Icons.Rounded.Search,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        },
+                        trailingIcon = {
+                            if (state.searchQuery.isNotEmpty()) {
+                                IconButton(
+                                    onClick = {
+                                        showAutocomplete = true
+                                        onQueryChange("")
+                                    },
+                                    modifier = Modifier.testTag("verifier_clear_search_button")
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Rounded.Close,
+                                        contentDescription = strings.verifierClearSearchCd,
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                        },
+                        singleLine = true,
+                        shape = RoundedCornerShape(20.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedContainerColor = MaterialTheme.colorScheme.surface,
+                            unfocusedContainerColor = MaterialTheme.colorScheme.surface,
+                            focusedBorderColor = PvsLeafVibrant,
+                            unfocusedBorderColor = MaterialTheme.colorScheme.outline
+                        ),
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                        keyboardActions = KeyboardActions(
+                            onSearch = {
+                                showAutocomplete = false
+                                onSubmitSearch()
+                                focusManager.clearFocus()
+                            }
+                        ),
+                        modifier = Modifier
+                            .weight(1f)
+                            .onFocusChanged { focusState ->
+                                if (focusState.isFocused) {
+                                    showAutocomplete = true
+                                }
+                            }
+                            .testTag("verifier_search_input")
                     )
+
+                    val scanIconInteraction = remember { MutableInteractionSource() }
+                    Surface(
+                        modifier = Modifier
+                            .size(52.dp)
+                            .pvsBouncyScale(scanIconInteraction)
+                            .clip(RoundedCornerShape(18.dp))
+                            .clickable(
+                                interactionSource = scanIconInteraction,
+                                indication = androidx.compose.material3.ripple()
+                            ) {
+                                haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                showAutocomplete = false
+                                focusManager.clearFocus()
+                                showScanner = true
+                            }
+                            .testTag("open_barcode_scanner_button"),
+                        shape = RoundedCornerShape(18.dp),
+                        color = MaterialTheme.colorScheme.primaryContainer,
+                        border = BorderStroke(1.dp, PvsLeafVibrant.copy(alpha = 0.5f))
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = Icons.Rounded.QrCodeScanner,
+                                contentDescription = strings.scannerOpenBtn,
+                                tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                modifier = Modifier.size(23.dp)
+                            )
+                        }
+                    }
+
+                    val searchBtnInteraction = remember { MutableInteractionSource() }
+                    Button(
+                        onClick = {
+                            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                            showAutocomplete = false
+                            focusManager.clearFocus()
+                            onSubmitSearch()
+                        },
+                        enabled = state.searchQuery.isNotBlank(),
+                        interactionSource = searchBtnInteraction,
+                        shape = RoundedCornerShape(18.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = PvsForestGreen),
+                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 15.dp),
+                        modifier = Modifier
+                            .pvsBouncyScale(searchBtnInteraction)
+                            .testTag("verifier_analyze_button")
+                    ) {
+                        Text(
+                            text = strings.verifierSearchAction,
+                            style = MaterialTheme.typography.labelLarge
+                        )
+                    }
+                }
+
+                // Autocomplete Suggestion Panel
+                AnimatedVisibility(
+                    visible = showAutocomplete && (autocompleteSuggestions.isNotEmpty() || state.searchQuery.isNotBlank()),
+                    enter = fadeIn(tween(180)) + expandVertically(),
+                    exit = fadeOut(tween(140)) + shrinkVertically()
+                ) {
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("verifier_autocomplete_dropdown"),
+                        shape = RoundedCornerShape(20.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+                        border = BorderStroke(1.dp, PvsLeafVibrant.copy(alpha = 0.45f))
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 6.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(start = 14.dp, end = 4.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = strings.verifierAutocompleteHeader(autocompleteSuggestions.size),
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                                IconButton(
+                                    onClick = {
+                                        showAutocomplete = false
+                                        focusManager.clearFocus()
+                                    },
+                                    modifier = Modifier
+                                        .size(48.dp)
+                                        .testTag("close_autocomplete_button")
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Rounded.Close,
+                                        contentDescription = strings.actionCancel,
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                            }
+
+                            if (autocompleteSuggestions.isEmpty()) {
+                                val customInt = remember { MutableInteractionSource() }
+                                Surface(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 10.dp, vertical = 4.dp)
+                                        .clip(RoundedCornerShape(14.dp))
+                                        .clickable(
+                                            interactionSource = customInt,
+                                            indication = androidx.compose.material3.ripple()
+                                        ) {
+                                            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                                            showAutocomplete = false
+                                            focusManager.clearFocus()
+                                            onSubmitSearch()
+                                        }
+                                        .testTag("autocomplete_custom_submit"),
+                                    shape = RoundedCornerShape(14.dp),
+                                    color = MaterialTheme.colorScheme.secondaryContainer
+                                ) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(horizontal = 12.dp, vertical = 12.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Rounded.AutoAwesome,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                        Text(
+                                            text = strings.verifierAutocompleteCustomAction(state.searchQuery.trim()),
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = MaterialTheme.colorScheme.onSurface,
+                                            modifier = Modifier.weight(1f)
+                                        )
+                                    }
+                                }
+                            } else {
+                                autocompleteSuggestions.forEachIndexed { idx, suggestion ->
+                                    if (idx > 0) {
+                                        HorizontalDivider(
+                                            modifier = Modifier.padding(horizontal = 14.dp),
+                                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                                        )
+                                    }
+                                    val rowInteraction = remember { MutableInteractionSource() }
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clickable(
+                                                interactionSource = rowInteraction,
+                                                indication = androidx.compose.material3.ripple()
+                                            ) {
+                                                haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                                showAutocomplete = false
+                                                focusManager.clearFocus()
+                                                onSelectExample(suggestion.product.code)
+                                            }
+                                            .padding(horizontal = 14.dp, vertical = 10.dp)
+                                            .semantics(mergeDescendants = true) {}
+                                            .testTag("autocomplete_suggestion_${suggestion.product.code}"),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                    ) {
+                                        val isCurrentProduct = state.verifiedProduct?.code.equals(
+                                            suggestion.product.code,
+                                            ignoreCase = true
+                                        )
+                                        CodePillBadge(
+                                            code = suggestion.product.code,
+                                            containerColor = if (isCurrentProduct) PvsForestGreen else MaterialTheme.colorScheme.primaryContainer,
+                                            contentColor = if (isCurrentProduct) Color.White else MaterialTheme.colorScheme.onPrimaryContainer
+                                        )
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(
+                                                text = suggestion.product.name,
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                fontWeight = FontWeight.SemiBold,
+                                                color = MaterialTheme.colorScheme.onSurface,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                            val subtitleText = buildString {
+                                                append(suggestion.product.category)
+                                                suggestion.barcode?.let { ean ->
+                                                    append(" · ")
+                                                    append(ean)
+                                                }
+                                            }
+                                            Text(
+                                                text = subtitleText,
+                                                style = MaterialTheme.typography.labelSmall,
+                                                fontFamily = JetBrainsMonoFontFamily,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                        }
+                                        Column(horizontalAlignment = Alignment.End) {
+                                            Text(
+                                                text = formatUsd(suggestion.product.storePrice),
+                                                style = MaterialTheme.typography.labelLarge,
+                                                fontFamily = JetBrainsMonoFontFamily,
+                                                fontWeight = FontWeight.Bold,
+                                                color = MaterialTheme.colorScheme.primary
+                                            )
+                                            if (suggestion.isRecent) {
+                                                Icon(
+                                                    imageVector = Icons.Rounded.History,
+                                                    contentDescription = null,
+                                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                    modifier = Modifier.size(14.dp)
+                                                )
+                                            } else {
+                                                Icon(
+                                                    imageVector = Icons.AutoMirrored.Rounded.ArrowForward,
+                                                    contentDescription = null,
+                                                    tint = PvsLeafVibrant,
+                                                    modifier = Modifier.size(14.dp)
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
             }
 
@@ -408,6 +656,7 @@ fun VerificadorScreen(
                             verdict = item?.verdict ?: PriceVerdict.GREEN,
                             selected = isSelected,
                             onClick = {
+                                showAutocomplete = false
                                 focusManager.clearFocus()
                                 onSelectExample(code)
                             }
@@ -440,7 +689,7 @@ fun VerificadorScreen(
                             Icon(
                                 imageVector = Icons.Rounded.History,
                                 contentDescription = null,
-                                tint = PvsForestGreen,
+                                tint = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.size(16.dp)
                             )
                             Text(
@@ -457,7 +706,7 @@ fun VerificadorScreen(
                             Text(
                                 text = strings.verifierClearRecent,
                                 style = MaterialTheme.typography.labelMedium,
-                                color = PvsForestGreen
+                                color = MaterialTheme.colorScheme.primary
                             )
                         }
                     }
@@ -485,10 +734,10 @@ fun VerificadorScreen(
                                     }
                                     .testTag("recent_chip_${recent.code}"),
                                 shape = RoundedCornerShape(14.dp),
-                                color = if (isSelected) PvsMintContainer else MaterialTheme.colorScheme.surface,
+                                color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
                                 border = BorderStroke(
                                     width = 1.dp,
-                                    color = if (isSelected) PvsForestGreen else MaterialTheme.colorScheme.outline
+                                    color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
                                 )
                             ) {
                                 Row(
@@ -501,7 +750,7 @@ fun VerificadorScreen(
                                         style = MaterialTheme.typography.labelMedium,
                                         fontFamily = JetBrainsMonoFontFamily,
                                         fontWeight = FontWeight.Bold,
-                                        color = PvsForestDark
+                                        color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
                                     )
                                     Text(
                                         text = recent.productName.substringBefore(" "),
@@ -546,6 +795,9 @@ fun VerificadorScreen(
                             },
                             onQuickAddClick = { onAddToCart(product) }
                         )
+
+                        // Quick Installment Calculator Card (Total Price & Selectable Biweekly Payments)
+                        BiweeklyQuotaCalculatorCard(product = product)
 
                         // Step 2: Semáforo + Market Price Comparison
                         VerifiedProductVerdictCard(
@@ -857,8 +1109,8 @@ private fun VerifiedProductVerdictCard(
                         title = strings.verifierAvgPrice,
                         price = formatUsd(product.averagePrice),
                         badgeText = strings.verifierMarketRef,
-                        badgeColor = PvsForestGreen,
-                        badgeBg = PvsMintSurface,
+                        badgeColor = MaterialTheme.colorScheme.primary,
+                        badgeBg = MaterialTheme.colorScheme.secondaryContainer,
                         modifier = Modifier.weight(1f)
                     )
                 }
@@ -881,7 +1133,7 @@ private fun VerifiedProductVerdictCard(
                                 Icon(
                                     imageVector = Icons.Rounded.Storefront,
                                     contentDescription = null,
-                                    tint = PvsForestGreen,
+                                    tint = MaterialTheme.colorScheme.primary,
                                     modifier = Modifier.size(18.dp)
                                 )
                                 Spacer(modifier = Modifier.width(6.dp))
@@ -905,7 +1157,7 @@ private fun VerifiedProductVerdictCard(
                                 .fillMaxWidth()
                                 .height(10.dp)
                                 .clip(RoundedCornerShape(50))
-                                .background(PvsMintContainer)
+                                .background(MaterialTheme.colorScheme.primaryContainer)
                         ) {
                             Row(modifier = Modifier.fillMaxSize()) {
                                 Box(
@@ -993,13 +1245,13 @@ private fun BudgetAffordabilityCard(
                         modifier = Modifier
                             .size(36.dp)
                             .clip(RoundedCornerShape(11.dp))
-                            .background(PvsMintSurface),
+                            .background(MaterialTheme.colorScheme.secondaryContainer),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
                             imageVector = Icons.Rounded.AccountBalanceWallet,
                             contentDescription = null,
-                            tint = PvsForestGreen,
+                            tint = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.size(20.dp)
                         )
                     }
@@ -1032,7 +1284,7 @@ private fun BudgetAffordabilityCard(
                         )
                         .testTag("edit_budget_button"),
                     shape = RoundedCornerShape(14.dp),
-                    color = PvsMintContainer
+                    color = MaterialTheme.colorScheme.primaryContainer
                 ) {
                     Row(
                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
@@ -1044,12 +1296,12 @@ private fun BudgetAffordabilityCard(
                             style = MaterialTheme.typography.titleMedium,
                             fontFamily = JetBrainsMonoFontFamily,
                             fontWeight = FontWeight.Bold,
-                            color = PvsForestDark
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
                         )
                         Icon(
                             imageVector = Icons.Rounded.Edit,
                             contentDescription = strings.budgetEditHint,
-                            tint = PvsForestGreen,
+                            tint = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.size(15.dp)
                         )
                     }
@@ -1086,7 +1338,7 @@ private fun BudgetAffordabilityCard(
                                 text = label,
                                 style = MaterialTheme.typography.labelMedium,
                                 fontFamily = JetBrainsMonoFontFamily,
-                                color = PvsForestDark
+                                color = MaterialTheme.colorScheme.onSurface
                             )
                         }
                     }
@@ -1133,7 +1385,7 @@ private fun BudgetAffordabilityCard(
                             style = MaterialTheme.typography.titleSmall,
                             fontFamily = JetBrainsMonoFontFamily,
                             fontWeight = FontWeight.Bold,
-                            color = if (freeMoney >= 0) PvsForestGreen else SemaphoreRed
+                            color = if (freeMoney >= 0) MaterialTheme.colorScheme.primary else SemaphoreRed
                         )
                     }
                 }
@@ -1217,7 +1469,7 @@ private fun AiProductBreakdownCard(
                     text = strings.aiSectionTitle,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
-                    color = PvsForestDark
+                    color = MaterialTheme.colorScheme.onSurface
                 )
             }
 
@@ -1298,7 +1550,7 @@ private fun AiProductBreakdownCard(
                     Surface(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(16.dp),
-                        color = PvsMintSurface
+                        color = MaterialTheme.colorScheme.secondaryContainer
                     ) {
                         Column(
                             modifier = Modifier.padding(14.dp),
@@ -1308,12 +1560,12 @@ private fun AiProductBreakdownCard(
                                 text = strings.aiSummaryLabel,
                                 style = MaterialTheme.typography.labelMedium,
                                 fontWeight = FontWeight.Bold,
-                                color = PvsForestGreen
+                                color = MaterialTheme.colorScheme.primary
                             )
                             Text(
                                 text = analysis.summary,
                                 style = MaterialTheme.typography.bodyMedium,
-                                color = PvsForestDark
+                                color = MaterialTheme.colorScheme.onSurface
                             )
                         }
                     }
@@ -1342,7 +1594,7 @@ private fun AiInfoBlock(
             Icon(
                 imageVector = icon,
                 contentDescription = null,
-                tint = PvsForestGreen,
+                tint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier
                     .padding(top = 2.dp)
                     .size(20.dp)
@@ -1470,13 +1722,13 @@ private fun NotFoundProductCard(
                 modifier = Modifier
                     .size(56.dp)
                     .clip(CircleShape)
-                    .background(PvsMintSurface),
+                    .background(MaterialTheme.colorScheme.secondaryContainer),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = Icons.Rounded.QrCodeScanner,
                     contentDescription = null,
-                    tint = PvsForestGreen,
+                    tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(28.dp)
                 )
             }
@@ -1503,12 +1755,12 @@ private fun NotFoundProductCard(
                             .clip(RoundedCornerShape(50))
                             .clickable { onSelectExample(code) },
                         shape = RoundedCornerShape(50),
-                        color = PvsMintContainer
+                        color = MaterialTheme.colorScheme.primaryContainer
                     ) {
                         Text(
                             text = code,
                             style = MaterialTheme.typography.labelSmall,
-                            color = PvsForestDark,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer,
                             modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
                         )
                     }

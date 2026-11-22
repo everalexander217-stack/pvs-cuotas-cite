@@ -1,0 +1,43 @@
+{
+  "name": "PVS Cuotas — Verificador y Cuotas",
+  "short_name": "PVS Cuotas",
+  "description": "Escanea códigos con la cámara de tu teléfono, evalúa precios con Gemini AI y controla tus cuotas quincenales.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#F6FAF7",
+  "theme_color": "#1B5E3A",
+  "lang": "es",
+  "categories": ["finance", "shopping", "utilities"],
+  "icons": [
+    {
+      "src": "./icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "./icons/icon-maskable.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Escanear código",
+      "short_name": "Escanear",
+      "description": "Abre la cámara para escanear un producto y ver su veredicto",
+      "url": "./?tab=verificador&scan=1",
+      "icons": [{ "src": "./icons/icon.svg", "sizes": "any", "type": "image/svg+xml" }]
+    },
+    {
+      "name": "Mis Cuotas",
+      "short_name": "Cuotas",
+      "description": "Consulta tus planes quincenales y distribución por categoría",
+      "url": "./?tab=cuotas",
+      "icons": [{ "src": "./icons/icon.svg", "sizes": "any", "type": "image/svg+xml" }]
+    }
+  ]
+}

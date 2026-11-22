@@ -655,4 +655,32 @@ class ExampleRobolectricTest {
             Dispatchers.resetMain()
         }
     }
+
+    @Test
+    fun `autocompleteSuggestions matches code prefixes names and retail barcodes`() {
+        val byPrefix = ProductVerifierCatalog.autocompleteSuggestions("ce")
+        assertEquals("CEL-128", byPrefix.first().product.code)
+
+        val byCompact = ProductVerifierCatalog.autocompleteSuggestions("lap16")
+        assertEquals("LAP-16", byCompact.first().product.code)
+
+        val byBarcode = ProductVerifierCatalog.autocompleteSuggestions("7501001000505")
+        assertEquals("AUD-05", byBarcode.first().product.code)
+        assertEquals("AUD-05", ProductVerifierCatalog.findByQuery("7501001000505")?.code)
+
+        val byName = ProductVerifierCatalog.autocompleteSuggestions("Espresso")
+        assertEquals("CAF-02", byName.first().product.code)
+
+        val recent = listOf(
+            com.example.data.RecentSearchEntity(
+                code = "CAF-02",
+                productName = "Cafetera Espresso Barista",
+                searchedAt = 5000L
+            )
+        )
+        val emptySuggestions = ProductVerifierCatalog.autocompleteSuggestions("", recentSearches = recent)
+        assertEquals(5, emptySuggestions.size)
+        assertEquals("CAF-02", emptySuggestions.first().product.code)
+        assertTrue(emptySuggestions.first().isRecent)
+    }
 }

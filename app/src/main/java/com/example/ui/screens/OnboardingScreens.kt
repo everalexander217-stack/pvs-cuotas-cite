@@ -466,6 +466,7 @@ fun PvsTutorialScreen(
             .testTag("tutorial_screen")
     ) {
         // Subtle organic background curves
+        val curveColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.75f)
         Canvas(modifier = Modifier.fillMaxSize()) {
             val topCurve = Path().apply {
                 moveTo(0f, 0f)
@@ -478,7 +479,7 @@ fun PvsTutorialScreen(
                 )
                 close()
             }
-            drawPath(topCurve, color = PvsMintSurface.copy(alpha = 0.75f))
+            drawPath(topCurve, color = curveColor)
         }
 
         Column(
@@ -504,7 +505,7 @@ fun PvsTutorialScreen(
                         text = "PVS Cuotas",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
-                        color = PvsForestDark
+                        color = MaterialTheme.colorScheme.onBackground
                     )
                 }
 
@@ -532,7 +533,7 @@ fun PvsTutorialScreen(
                         Text(
                             text = strings.tutorialSkip,
                             style = MaterialTheme.typography.labelLarge,
-                            color = PvsForestGreen
+                            color = MaterialTheme.colorScheme.primary
                         )
                     }
                 }
@@ -659,7 +660,7 @@ private fun TutorialStepPage(
 
         Surface(
             shape = RoundedCornerShape(50),
-            color = PvsMintContainer
+            color = MaterialTheme.colorScheme.primaryContainer
         ) {
             Row(
                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
@@ -669,14 +670,14 @@ private fun TutorialStepPage(
                 Icon(
                     imageVector = icon,
                     contentDescription = null,
-                    tint = PvsForestDark,
+                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
                     modifier = Modifier.size(16.dp)
                 )
                 Text(
                     text = "0${page + 1} / 03",
                     style = MaterialTheme.typography.labelSmall,
                     fontWeight = FontWeight.Bold,
-                    color = PvsForestDark
+                    color = MaterialTheme.colorScheme.onPrimaryContainer
                 )
             }
         }
@@ -687,7 +688,7 @@ private fun TutorialStepPage(
             text = title,
             style = MaterialTheme.typography.headlineSmall,
             fontWeight = FontWeight.Bold,
-            color = PvsForestDark,
+            color = MaterialTheme.colorScheme.onBackground,
             textAlign = TextAlign.Center
         )
 
@@ -714,9 +715,9 @@ private fun TutorialPreviewInstallments() {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
-        border = BorderStroke(1.dp, PvsMintContainer)
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
     ) {
         Column(
             modifier = Modifier.padding(18.dp),
@@ -741,7 +742,7 @@ private fun TutorialPreviewInstallments() {
                     Text(
                         text = "Smart TV 50\" 4K",
                         style = MaterialTheme.typography.titleSmall,
-                        color = PvsForestDark
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                 }
                 Text(
@@ -749,7 +750,7 @@ private fun TutorialPreviewInstallments() {
                     style = MaterialTheme.typography.titleMedium,
                     fontFamily = JetBrainsMonoFontFamily,
                     fontWeight = FontWeight.Bold,
-                    color = PvsForestGreen
+                    color = MaterialTheme.colorScheme.primary
                 )
             }
 
@@ -768,7 +769,7 @@ private fun TutorialPreviewInstallments() {
                     text = "4/6 cuotas",
                     style = MaterialTheme.typography.labelMedium,
                     fontFamily = JetBrainsMonoFontFamily,
-                    color = PvsForestGreen
+                    color = MaterialTheme.colorScheme.primary
                 )
             }
         }
@@ -792,9 +793,9 @@ private fun TutorialPreviewVerifier() {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
-        border = BorderStroke(1.dp, PvsMintContainer)
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
     ) {
         Column(
             modifier = Modifier.padding(18.dp),
@@ -842,7 +843,7 @@ private fun TutorialPreviewAlerts() {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
         border = BorderStroke(1.2.dp, PvsLeafVibrant.copy(alpha = 0.5f))
     ) {
@@ -874,13 +875,13 @@ private fun TutorialPreviewAlerts() {
                 Text(
                     text = "${strings.notifUpcomingTitle} · TV-50",
                     style = MaterialTheme.typography.labelMedium,
-                    color = PvsForestGreen
+                    color = MaterialTheme.colorScheme.primary
                 )
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
                     text = "Smart TV 50\" 4K UHD",
                     style = MaterialTheme.typography.titleSmall,
-                    color = PvsForestDark
+                    color = MaterialTheme.colorScheme.onSurface
                 )
                 Text(
                     text = "$48.63 · ${strings.urgencyLabel(2)}",

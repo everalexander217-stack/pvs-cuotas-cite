@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="es" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" content="#1B5E3A" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="PVS Cuotas" />
+  <meta name="description" content="PVS Cuotas PWA: escanea códigos de barras en tu teléfono, obtén el veredicto con Gemini AI y calcula tus cuotas quincenales." />
+
+  <title>PVS Cuotas · Verificador y Cuotas Web</title>
+
+  <link rel="manifest" href="./manifest.webmanifest" />
+  <link rel="icon" href="./icons/icon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="./icons/icon.svg" />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <!-- Top Header -->
+    <header class="top-header">
+      <div class="brand-lockup">
+        <div class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 64 64" width="36" height="36">
+            <rect width="64" height="64" rx="16" fill="#0D3822" />
+            <path d="M18 16h14c8 0 13 4.5 13 11.5S40 39 32 39h-6v9h-8V16zm8 7v9h5.5c3.4 0 5.5-1.7 5.5-4.5S34.9 23 31.5 23H26z" fill="#FFFFFF" />
+            <path d="M40 48c5.5-1 10-5.4 11-11-5.5 1-10 5.4-11 11z" fill="#4CD478" />
+          </svg>
+        </div>
+        <div>
+          <div class="brand-title-row">
+            <span class="brand-name">PVS Cuotas</span>
+            <span class="pwa-pill">PWA</span>
+          </div>
+          <p class="brand-subtitle" id="header-subtitle">Verificador web y cuotas</p>
+        </div>
+      </div>
+
+      <div class="header-actions">
+        <button type="button" class="icon-btn" id="btn-install-pwa" title="Instalar App en teléfono" aria-label="Instalar App en teléfono" hidden>
+          <span class="material-icon">📲</span>
+        </button>
+        <button type="button" class="icon-btn" id="btn-api-settings" title="Configurar Gemini API" aria-label="Configurar Gemini API">
+          <span class="status-dot" id="api-status-dot"></span>
+          <span class="material-icon">✨</span>
+        </button>
+        <button type="button" class="icon-btn" id="btn-theme-toggle" title="Cambiar modo oscuro/claro" aria-label="Cambiar entre tema claro y oscuro">
+          <span class="material-icon" id="theme-icon">🌙</span>
+        </button>
+        <button type="button" class="icon-btn" id="btn-tutorial" title="Guía rápida" aria-label="Abrir tutorial rápido">
+          <span class="material-icon">?</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Install / Offline / HTTPS Notice Banner -->
+    <div id="install-banner" class="install-banner" hidden>
+      <div class="install-banner-copy">
+        <strong>Instala PVS Cuotas en tu teléfono</strong>
+        <span id="install-banner-text">Ábrela desde tu pantalla de inicio sin instalar APK.</span>
+      </div>
+      <div class="install-banner-actions">
+        <button type="button" class="btn btn-sm btn-primary" id="btn-banner-install">Instalar</button>
+        <button type="button" class="btn-ghost-close" id="btn-banner-close" aria-label="Cerrar aviso">✕</button>
+      </div>
+    </div>
+
+    <!-- Main Scrollable Viewport -->
+    <main class="main-content" id="main-content">
+      <!-- TAB 1: INICIO (DASHBOARD) -->
+      <section class="tab-panel" id="tab-inicio" data-tab="inicio" hidden>
+        <div class="hero-card forest-gradient">
+          <div class="hero-top">
+            <div>
+              <span class="eyebrow">Presupuesto Quincenal</span>
+              <h1 class="hero-amount" id="dash-budget-amount">$420.00</h1>
+            </div>
+            <button type="button" class="btn btn-light-pill" id="btn-edit-budget">Editar tope</button>
+          </div>
+
+          <div class="hero-metrics-grid">
+            <div class="metric-tile">
+              <span class="metric-label">Cuotas activas</span>
+              <strong class="metric-value" id="dash-biweekly-total">$0.00</strong>
+            </div>
+            <div class="metric-tile">
+              <span class="metric-label">Disponible libre</span>
+              <strong class="metric-value" id="dash-available-left">$0.00</strong>
+            </div>
+          </div>
+
+          <div class="budget-progress-wrap">
+            <div class="budget-progress-bar">
+              <div class="budget-progress-fill" id="dash-budget-bar"></div>
+            </div>
+            <span class="budget-progress-caption" id="dash-budget-caption">0% de tu quincena comprometida</span>
+          </div>
+        </div>
+
+        <!-- Quick Scan CTA -->
+        <button type="button" class="scan-cta-banner" id="btn-home-scan">
+          <div class="scan-cta-icon">📷</div>
+          <div class="scan-cta-text">
+            <strong>Escanear código con cámara</strong>
+            <span>Verifica con Gemini si vale la pena antes de comprar</span>
+          </div>
+          <span class="scan-cta-arrow">→</span>
+        </button>
+
+        <!-- Upcoming Alerts -->
+        <div class="card" id="upcoming-alerts-card">
+          <div class="card-header">
+            <h2>Próximas cuotas por vencer</h2>
+            <span class="pill-count" id="alerts-count-badge">0</span>
+          </div>
+          <div id="upcoming-alerts-list" class="stack-sm"></div>
+        </div>
+
+        <!-- Category Donut Chart -->
+        <div class="card" id="category-chart-card">
+          <div class="card-header">
+            <div>
+              <h2>Gastos por categoría</h2>
+              <p class="card-subtitle">Distribución de tus planes activos</p>
+            </div>
+            <div class="segmented-control" role="tablist" aria-label="Modo de gráfico">
+              <button type="button" class="seg-btn active" data-chart-mode="biweekly">Quincena</button>
+              <button type="button" class="seg-btn" data-chart-mode="total">Total</button>
+            </div>
+          </div>
+          <div class="pie-layout">
+            <div class="pie-svg-wrap" id="category-pie-wrap"></div>
+            <div class="pie-legend" id="category-pie-legend"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 2: VERIFICADOR (CAMERA SCANNER + MANUAL SEARCH + GEMINI VERDICT + CALCULATOR) -->
+      <section class="tab-panel active" id="tab-verificador" data-tab="verificador">
+        <!-- Hero Scanner Banner -->
+        <div class="verifier-hero">
+          <div class="verifier-hero-copy">
+            <span class="eyebrow">Cámara Web + Gemini AI</span>
+            <h1>Verificador de Precios</h1>
+            <p>Escanea cualquier código de barras o escríbelo para obtener el semáforo de compra al instante.</p>
+          </div>
+          <div class="verifier-cta-row">
+            <button type="button" class="btn btn-primary btn-lg flex-1" id="btn-open-scanner">
+              <span>📷</span> Escanear código
+            </button>
+            <label class="btn btn-outline-light btn-lg" for="photo-barcode-input" title="Subir o tomar foto del código">
+              <span>🖼️</span> Foto
+              <input type="file" id="photo-barcode-input" accept="image/*" capture="environment" hidden />
+            </label>
+          </div>
+        </div>
+
+        <!-- Manual Search with Autocomplete -->
+        <div class="card search-card">
+          <label for="search-code-input" class="input-label">Buscar código, EAN-13 o nombre del producto</label>
+          <div class="search-input-row">
+            <div class="search-field-wrap">
+              <input
+                type="search"
+                id="search-code-input"
+                class="text-input"
+                placeholder="Ej. 7501001005011, TV-50 o AirPods Pro"
+                autocomplete="off"
+              />
+              <div id="autocomplete-dropdown" class="autocomplete-dropdown" hidden></div>
+            </div>
+            <button type="button" class="btn btn-primary" id="btn-submit-search">Verificar</button>
+          </div>
+
+          <div class="store-price-inline">
+            <label for="store-price-input" class="inline-label">Precio visto en tienda (opcional, USD):</label>
+            <input
+              type="number"
+              id="store-price-input"
+              class="text-input text-input-sm mono"
+              placeholder="Ej. 389.00"
+              min="0.01"
+              step="0.01"
+              inputmode="decimal"
+            />
+          </div>
+
+          <!-- Quick Catalog Examples -->
+          <div class="chips-scroll" id="example-chips-row">
+            <button type="button" class="chip-btn" data-code="TV-50">📺 TV-50</button>
+            <button type="button" class="chip-btn" data-code="CEL-128">📱 CEL-128</button>
+            <button type="button" class="chip-btn" data-code="ZAP-01">👟 ZAP-01</button>
+            <button type="button" class="chip-btn" data-code="AUD-05">🎧 AUD-05</button>
+            <button type="button" class="chip-btn" data-code="LAP-16">💻 LAP-16</button>
+          </div>
+        </div>
+
+        <!-- Verified Product + Traffic-Light Semaphore + Gemini Verdict -->
+        <div id="verifier-result-area">
+          <!-- Rendered dynamically by app.js -->
+        </div>
+      </section>
+
+      <!-- TAB 3: MIS CUOTAS -->
+      <section class="tab-panel" id="tab-cuotas" data-tab="cuotas" hidden>
+        <div class="section-header-row">
+          <div>
+            <h1>Mis Cuotas</h1>
+            <p class="card-subtitle">Controla tus pagos quincenales y categorías</p>
+          </div>
+          <button type="button" class="btn btn-primary" id="btn-open-add-quota">+ Nueva</button>
+        </div>
+
+        <div class="chips-scroll" id="cuotas-category-filters"></div>
+
+        <div id="installments-list" class="stack-md"></div>
+      </section>
+
+      <!-- TAB 4: ASISTENTE GEMINI -->
+      <section class="tab-panel" id="tab-asistente" data-tab="asistente" hidden>
+        <div class="card chat-intro-card">
+          <div class="chat-intro-row">
+            <div>
+              <h2>Asistente Financiero PVS</h2>
+              <p class="card-subtitle" id="assistant-mode-label">Conectado a Gemini API con tu presupuesto actual</p>
+            </div>
+            <button type="button" class="btn btn-sm btn-outline" id="btn-clear-chat">Limpiar</button>
+          </div>
+          <div class="chips-scroll">
+            <button type="button" class="chip-btn chat-prompt-chip" data-prompt="¿Me alcanza mi quincena actual para sumar otra compra de $180 en 6 cuotas?">¿Me alcanza mi quincena?</button>
+            <button type="button" class="chip-btn chat-prompt-chip" data-prompt="Dame 3 consejos rápidos para evitar cuotas caras o sobreprecios">Evitar sobreprecios</button>
+            <button type="button" class="chip-btn chat-prompt-chip" data-prompt="Analiza mis cuotas actuales y dime cuál debería liquidar primero">¿Cuál liquido primero?</button>
+          </div>
+        </div>
+
+        <div id="chat-messages-box" class="chat-messages"></div>
+
+        <form id="chat-form" class="chat-input-bar">
+          <input
+            type="text"
+            id="chat-input"
+            class="text-input flex-1"
+            placeholder="Pregunta sobre una compra o tus cuotas..."
+            autocomplete="off"
+          />
+          <button type="submit" class="btn btn-primary" id="btn-send-chat">Enviar</button>
+        </form>
+      </section>
+    </main>
+
+    <!-- Bottom Tab Navigation -->
+    <nav class="bottom-nav" aria-label="Navegación principal">
+      <button type="button" class="nav-item" data-nav="inicio">
+        <span class="nav-icon">🏠</span>
+        <span class="nav-label">Inicio</span>
+      </button>
+      <button type="button" class="nav-item active" data-nav="verificador">
+        <span class="nav-icon">📷</span>
+        <span class="nav-label">Verificador</span>
+      </button>
+      <button type="button" class="nav-item" data-nav="cuotas">
+        <span class="nav-icon">💳</span>
+        <span class="nav-label">Mis Cuotas</span>
+      </button>
+      <button type="button" class="nav-item" data-nav="asistente">
+        <span class="nav-icon">✨</span>
+        <span class="nav-label">Asistente</span>
+      </button>
+    </nav>
+  </div>
+
+  <!-- FULLSCREEN WEB CAMERA BARCODE SCANNER MODAL -->
+  <div id="scanner-modal" class="scanner-modal" role="dialog" aria-modal="true" aria-label="Escáner de códigos de barras" hidden>
+    <video id="scanner-video" class="scanner-video" autoplay playsinline muted></video>
+    <canvas id="scanner-overlay-canvas" class="scanner-overlay-canvas"></canvas>
+
+    <div class="scanner-ui">
+      <div class="scanner-top-bar">
+        <div class="scanner-title-group">
+          <strong>Escáner PVS</strong>
+          <span id="scanner-engine-label">Cámara web activa</span>
+        </div>
+        <button type="button" class="scanner-round-btn" id="btn-close-scanner" aria-label="Cerrar escáner">✕</button>
+      </div>
+
+      <div class="scanner-reticle-guide">
+        <div class="scanner-reticle-box" id="scanner-reticle-box">
+          <div class="scanner-laser"></div>
+        </div>
+      </div>
+
+      <div class="scanner-bottom-bar">
+        <div class="scanner-hint-pill" id="scanner-hint-pill">
+          Apunta al código de barras o QR del producto
+        </div>
+        <div class="scanner-controls-row">
+          <button type="button" class="scanner-round-btn" id="btn-scanner-torch" aria-label="Activar linterna" title="Linterna">🔦</button>
+          <button type="button" class="scanner-round-btn" id="btn-scanner-flip" aria-label="Cambiar cámara" title="Cambiar cámara">🔄</button>
+          <label class="scanner-round-btn" for="photo-barcode-input-modal" title="Elegir imagen con código">
+            🖼️
+            <input type="file" id="photo-barcode-input-modal" accept="image/*" hidden />
+          </label>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- GEMINI API KEY & PREFERENCES MODAL -->
+  <div id="api-modal" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="api-modal-title" hidden>
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2 id="api-modal-title">Configurar Gemini API</h2>
+        <button type="button" class="btn-ghost-close" data-close-modal="api-modal" aria-label="Cerrar">✕</button>
+      </div>
+      <p class="modal-desc">
+        Para que el navegador consulte directamente a <strong>Gemini</strong> y evalúe cualquier producto escaneado (<em>Vale la pena / Piénsalo dos veces / No vale la pena</em>), pega tu API Key de Google AI Studio. Se guarda únicamente en tu teléfono (<code>localStorage</code>).
+      </p>
+      <label for="gemini-api-key-input" class="input-label">Google Gemini API Key</label>
+      <input
+        type="password"
+        id="gemini-api-key-input"
+        class="text-input mono"
+        placeholder="AIza..."
+        autocomplete="off"
+      />
+      <label for="gemini-model-select" class="input-label mt-sm">Modelo Gemini</label>
+      <select id="gemini-model-select" class="text-input">
+        <option value="gemini-2.5-flash">gemini-2.5-flash (Recomendado y rápido)</option>
+        <option value="gemini-2.5-flash-lite">gemini-2.5-flash-lite (Ultra ligero)</option>
+      </select>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-outline" id="btn-clear-api-key">Borrar clave</button>
+        <button type="button" class="btn btn-primary" id="btn-save-api-key">Guardar y conectar</button>
+      </div>
+      <p class="modal-footnote">
+        Sin clave configurada, la PWA sigue funcionando con el catálogo local PVS y el motor heurístico de precios.
+      </p>
+    </div>
+  </div>
+
+  <!-- ADD INSTALLMENT MODAL -->
+  <div id="add-quota-modal" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="add-quota-title" hidden>
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2 id="add-quota-title">Nueva cuota quincenal</h2>
+        <button type="button" class="btn-ghost-close" data-close-modal="add-quota-modal" aria-label="Cerrar">✕</button>
+      </div>
+      <form id="add-quota-form" class="stack-sm">
+        <div>
+          <label for="quota-title-input" class="input-label">Producto</label>
+          <input type="text" id="quota-title-input" class="text-input" placeholder="Ej. Monitor 27 pulgadas" required />
+        </div>
+        <div class="two-col">
+          <div>
+            <label for="quota-code-input" class="input-label">Código</label>
+            <input type="text" id="quota-code-input" class="text-input mono" placeholder="MON-27" />
+          </div>
+          <div>
+            <label for="quota-category-select" class="input-label">Categoría</label>
+            <select id="quota-category-select" class="text-input">
+              <option value="Tecnología">Tecnología</option>
+              <option value="Hogar">Hogar</option>
+              <option value="Salud">Salud</option>
+              <option value="Telefonía">Telefonía</option>
+              <option value="Audio">Audio</option>
+              <option value="Calzado">Calzado</option>
+              <option value="Educación">Educación</option>
+              <option value="Transporte">Transporte</option>
+              <option value="General">General</option>
+            </select>
+          </div>
+        </div>
+        <div class="two-col">
+          <div>
+            <label for="quota-total-input" class="input-label">Precio total (USD)</label>
+            <input type="number" id="quota-total-input" class="text-input mono" min="1" step="0.01" placeholder="240.00" required />
+          </div>
+          <div>
+            <label for="quota-count-input" class="input-label">Quincenas</label>
+            <select id="quota-count-input" class="text-input">
+              <option value="2">2 cuotas</option>
+              <option value="4" selected>4 cuotas</option>
+              <option value="6">6 cuotas</option>
+              <option value="8">8 cuotas</option>
+              <option value="12">12 cuotas</option>
+            </select>
+          </div>
+        </div>
+        <div class="preview-pill" id="add-quota-preview">Inicial 25% + 4 cuotas quincenales</div>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-outline" data-close-modal="add-quota-modal">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Guardar cuota</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- CATEGORY TAG PICKER MODAL -->
+  <div id="category-modal" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="category-modal-title" hidden>
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2 id="category-modal-title">Etiquetar categoría</h2>
+        <button type="button" class="btn-ghost-close" data-close-modal="category-modal" aria-label="Cerrar">✕</button>
+      </div>
+      <div id="category-preset-chips" class="chips-wrap"></div>
+      <form id="custom-category-form" class="stack-sm mt-sm">
+        <label for="custom-category-input" class="input-label">O crea una etiqueta personalizada</label>
+        <div class="search-input-row">
+          <input type="text" id="custom-category-input" class="text-input" placeholder="Ej. Gimnasio, Mascotas..." maxlength="32" />
+          <button type="submit" class="btn btn-primary">Aplicar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- BUDGET MODAL -->
+  <div id="budget-modal" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="budget-modal-title" hidden>
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2 id="budget-modal-title">Presupuesto por quincena</h2>
+        <button type="button" class="btn-ghost-close" data-close-modal="budget-modal" aria-label="Cerrar">✕</button>
+      </div>
+      <form id="budget-form" class="stack-sm">
+        <label for="budget-amount-input" class="input-label">Monto disponible por quincena (USD)</label>
+        <input type="number" id="budget-amount-input" class="text-input mono" min="20" step="5" required />
+        <div class="modal-actions">
+          <button type="button" class="btn btn-outline" data-close-modal="budget-modal">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Actualizar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- COACH MARK / TUTORIAL OVERLAY -->
+  <div id="tutorial-modal" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="tutorial-title" hidden>
+    <div class="modal-card">
+      <div class="modal-header">
+        <span class="eyebrow" id="tutorial-step-counter">Paso 1 de 3</span>
+        <button type="button" class="btn-ghost-close" data-close-modal="tutorial-modal" aria-label="Saltar tutorial">✕</button>
+      </div>
+      <h2 id="tutorial-title">Escanea desde tu navegador</h2>
+      <p id="tutorial-body" class="modal-desc"></p>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-outline" id="btn-tutorial-skip">Cerrar</button>
+        <button type="button" class="btn btn-primary" id="btn-tutorial-next">Siguiente →</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+
+  <script type="module" src="./app.js"></script>
+</body>
+</html>

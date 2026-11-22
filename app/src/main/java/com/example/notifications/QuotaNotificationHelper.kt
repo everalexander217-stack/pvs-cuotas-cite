@@ -28,6 +28,8 @@ object QuotaNotificationHelper {
     const val KEY_NOTIFICATIONS_ENABLED = "notifications_enabled"
     const val KEY_ALERT_THRESHOLD_DAYS = "alert_threshold_days"
     const val KEY_APP_LANGUAGE = "app_language"
+    const val KEY_DARK_MODE = "dark_mode_enabled"
+    const val KEY_COACH_MARK_COMPLETED = "coach_mark_completed"
     const val KEY_LAST_NOTIFIED_SIGNATURE = "last_notified_signature"
 
     const val CHANNEL_ID = "pvs_quota_reminders"

@@ -16,7 +16,10 @@ interface ProductNoteDao {
     fun observeForProduct(productCode: String): Flow<List<ProductNoteEntity>>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insert(note: ProductNoteEntity)
+    suspend fun insert(note: ProductNoteEntity): Long
+
+    @Query("SELECT * FROM product_notes WHERE id = :id LIMIT 1")
+    suspend fun getById(id: Int): ProductNoteEntity?
 
     @Update
     suspend fun update(note: ProductNoteEntity)
